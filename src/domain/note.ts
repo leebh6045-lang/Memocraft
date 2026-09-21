@@ -1,0 +1,68 @@
+// 分类顺序是产品约定；完成语义也由 category 表达，不另存任务状态。
+export const NOTE_CATEGORIES = [
+  { value: 'insight', label: '收获' },
+  { value: 'todo', label: '待办' },
+  { value: 'done', label: '完成' },
+  { value: 'misc', label: '杂项' },
+] as const;
+
+export type NoteCategory = (typeof NOTE_CATEGORIES)[number]['value'];
+
+export interface NoteContent {
+  body: string;
+  title: string;
+  category: NoteCategory;
+  tags: string[];
+}
+
+export interface NoteDraft extends NoteContent {
+  /** 正式提交时沿用此 ID，重试也不会新建另一条手记。 */
+  id: string;
+  /** 随本地输入递增，用于拒绝迟到的草稿写入。 */
+  revision: number;
+  extrasOpen: boolean;
+}
+
+export interface Note extends NoteContent {
+  id: string;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NoteEdit extends NoteContent {
+  id: string;
+  /** 编辑所基于的已保存版本，防止覆盖其他更新。 */
+  expectedRevision: number;
+}
+
+export interface LibrarySnapshot {
+  draft: NoteDraft | null;
+  notes: Note[];
+}
+
+export interface NoteSearchResult {
+  notes: Note[];
+  hasMore: boolean;
+}
+
+// 无标题时只生成展示摘要，不把摘要写回标题或正文。
+export function noteTitle(note: NoteContent): string {
+  return (
+    note.title.trim() ||
+    note.body
+      .split('\n')
+      .find((line) => line.trim())
+      ?.trim()
+      .slice(0, 80) ||
+    '无标题手记'
+  );
+}
+
+export function categoryLabel(category: NoteCategory): string {
+  return NOTE_CATEGORIES.find((item) => item.value === category)?.label ?? '杂项';
+}
+
+export function emptyDraft(id: string): NoteDraft {
+  return { id, revision: 0, body: '', title: '', category: 'insight', tags: [], extrasOpen: false };
+}

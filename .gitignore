@@ -1,0 +1,48 @@
+# Local-only research, prototypes, screenshots and private notes
+/.local/
+/mym/
+/docs/thinking/
+/docs/历史文档/
+/初步想法.md
+/思维收束.md
+/需求规格说明书-v1.md
+/v1开工总纲.md
+/技术栈与工具清单.md
+/项目结构.md
+/开发准则.md
+/SQLite说明.md
+/历史文档/
+
+# Dependencies and generated artifacts
+/node_modules/
+/.pnpm-store/
+/memocraft-*.tgz
+/out/
+/dist/
+/release/
+/coverage/
+/test-results/
+/playwright-report/
+/.vite/
+*.tsbuildinfo
+
+# Local runtime data and backup/export locations (fixtures remain trackable)
+/data/
+/backups/
+/exports/
+/logs/
+
+# Local settings, credentials and platform noise
+/.idea/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.cer
+/secrets/
+.DS_Store
+Thumbs.db
+*.log

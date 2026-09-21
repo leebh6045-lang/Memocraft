@@ -1,0 +1,362 @@
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { DatabaseSync } from 'node:sqlite';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { emptyDraft, type NoteDraft } from '../../src/domain/note';
+import { NoteStore } from '../../src/storage/note-store';
+import { restoreDatabaseBackup } from '../../src/storage/restore';
+
+const migrationsDirectory = resolve('migrations');
+let temporaryDirectory: string;
+const stores: NoteStore[] = [];
+
+function open(
+  directory = join(temporaryDirectory, 'data'),
+  migrations = migrationsDirectory,
+): NoteStore {
+  const store = new NoteStore({ dataDirectory: directory, migrationsDirectory: migrations });
+  stores.push(store);
+  return store;
+}
+function close(store: NoteStore): void {
+  store.close();
+  stores.splice(stores.indexOf(store), 1);
+}
+function draft(overrides: Partial<NoteDraft> = {}): NoteDraft {
+  return {
+    ...emptyDraft(randomUUID()),
+    revision: 1,
+    body: '中文知识\n```ts\nconst value = "🙂";\n```\n',
+    ...overrides,
+  };
+}
+function mutateDatabase(operation: (database: DatabaseSync) => void): void {
+  const database = new DatabaseSync(join(temporaryDirectory, 'data', 'memocraft.sqlite'));
+  try {
+    database.exec('PRAGMA foreign_keys = ON');
+    operation(database);
+  } finally {
+    database.close();
+  }
+}
+
+beforeEach(() => {
+  temporaryDirectory = mkdtempSync(join(tmpdir(), 'memocraft-storage-'));
+});
+afterEach(() => {
+  for (const store of stores.splice(0)) store.close();
+  rmSync(temporaryDirectory, { recursive: true, force: true });
+});
+
+describe('真实 SQLite 记录闭环', () => {
+  it('重启恢复草稿全部字段，清空载荷后旧版本不会复活', () => {
+    const first = open();
+    const content = draft({
+      title: '草稿标题',
+      tags: ['SQLite'],
+      category: 'todo',
+      extrasOpen: true,
+      revision: 4,
+    });
+    first.saveDraft(content);
+    expect(first.load().notes).toEqual([]);
+    expect(first.search('中文').notes).toEqual([]);
+    close(first);
+    const reopened = open();
+    expect(reopened.load().draft).toEqual(content);
+    const cleared = { ...content, body: '', title: '', tags: [], revision: 5 };
+    reopened.saveDraft(cleared);
+    expect(reopened.saveDraft(content)).toEqual(cleared);
+    close(reopened);
+    expect(open().load().draft).toEqual(cleared);
+  });
+
+  it('原子提交幂等，迟到草稿不能覆盖下一条草稿', () => {
+    const store = open();
+    const content = draft({ tags: ['知识', 'SQLite'] });
+    store.saveDraft(content);
+    const saved = store.commitDraft(content);
+    expect(saved.body).toBe(content.body);
+    expect(saved.tags).toEqual(content.tags);
+    expect(store.load().draft).toBeNull();
+    const next = draft({ body: '下一份内容' });
+    store.saveDraft(next);
+    expect(store.commitDraft(content)).toEqual(saved);
+    expect(() => store.saveDraft({ ...content, revision: 9 })).toThrow('已经保存');
+    expect(() => store.saveDraft(draft())).toThrow('另一份草稿');
+    expect(store.load()).toEqual({ draft: next, notes: [saved] });
+    expect(new Date(saved.createdAt).toISOString()).toBe(saved.createdAt);
+  });
+
+  it('拒绝相同版本不同载荷和使用过期内容提交', () => {
+    const store = open();
+    const content = draft({ revision: 3 });
+    store.saveDraft(content);
+    expect(() => store.saveDraft({ ...content, body: '冲突' })).toThrow('版本发生冲突');
+    expect(() => store.commitDraft({ ...content, revision: 2 })).toThrow('更新的草稿');
+    expect(store.load().draft).toEqual(content);
+  });
+
+  it('标签写入故障回滚手记和关联，保留草稿且可重试', () => {
+    const store = open();
+    const content = draft({ tags: ['事务回滚'] });
+    store.saveDraft(content);
+    mutateDatabase((database) =>
+      database.exec(
+        "CREATE TRIGGER reject_tag BEFORE INSERT ON note_tags BEGIN SELECT RAISE(ABORT, 'simulated write failure'); END",
+      ),
+    );
+    expect(() => store.commitDraft(content)).toThrow('simulated write failure');
+    expect(store.load()).toEqual({ draft: content, notes: [] });
+    mutateDatabase((database) => {
+      expect(database.prepare('SELECT count(*) AS count FROM tags').get()?.count).toBe(0);
+      database.exec('DROP TRIGGER reject_tag');
+    });
+    expect(store.commitDraft(content).tags).toEqual(['事务回滚']);
+  });
+
+  it('编辑原记录保留创建时间，支持幂等重试，拒绝冲突且不影响首页草稿', () => {
+    const store = open();
+    const saved = store.commitDraft(draft({ category: 'todo' }));
+    const next = draft();
+    store.saveDraft(next);
+    const edit = {
+      ...saved,
+      expectedRevision: saved.revision,
+      body: '更新后的正文',
+      category: 'done' as const,
+      tags: ['完成'],
+    };
+    const updated = store.updateNote(edit);
+    expect(updated.id).toBe(saved.id);
+    expect(updated.createdAt).toBe(saved.createdAt);
+    expect(updated.revision).toBe(2);
+    expect(store.updateNote(edit)).toEqual(updated);
+    expect(() => store.updateNote({ ...edit, body: '旧窗口内容' })).toThrow('已有更新');
+    expect(store.load().draft).toEqual(next);
+    expect(store.search('更新后').notes).toEqual([updated]);
+  });
+
+  it('空白正文拒绝保存，数据库分类/关系约束实际生效', () => {
+    const store = open();
+    expect(() => store.commitDraft(draft({ body: '\t\n　 ' }))).toThrow('正文');
+    const note = store.commitDraft(draft());
+    expect(note.category).toBe('insight');
+    mutateDatabase((database) => {
+      expect(() =>
+        database.prepare('UPDATE notes SET category = ? WHERE id = ?').run('invalid', note.id),
+      ).toThrow();
+      expect(() =>
+        database.prepare('INSERT INTO note_tags VALUES (?, ?, ?)').run('missing', 999, 0),
+      ).toThrow();
+      expect(
+        database
+          .prepare(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('topics', 'threads')",
+          )
+          .all(),
+      ).toEqual([]);
+    });
+  });
+
+  it('中文、英文大小写、标签、emoji与普通符号按子串搜索，软删除隐藏', () => {
+    const store = open();
+    const note = store.commitDraft(
+      draft({ body: '证书 TLS 100% foo_bar C:\\temp 🙂', title: '唯一标题', tags: ['标签命中'] }),
+    );
+    const unrelated = store.commitDraft(draft({ body: '100000 fooXbar C:/temp' }));
+    for (const query of ['证书', 'tls', '%', '_', '\\', '🙂', '唯一标题', '标签命中'])
+      expect(store.search(query).notes).toEqual([note]);
+    expect(store.search('   ')).toEqual({ notes: store.load().notes, hasMore: false });
+    mutateDatabase((database) =>
+      database
+        .prepare('UPDATE notes SET deleted_at = ? WHERE id = ?')
+        .run(new Date().toISOString(), note.id),
+    );
+    expect(store.search('证书').notes).toEqual([]);
+    expect(store.load().notes).toEqual([unrelated]);
+  });
+
+  it('标签原文区分大小写，编辑重试不被其他手记的标签拼写影响', () => {
+    const store = open();
+    store.commitDraft(draft({ tags: ['SQLite'] }));
+    const note = store.commitDraft(draft({ tags: ['sqlite'] }));
+    const edit = { ...note, expectedRevision: note.revision, body: '修改正文' };
+    const updated = store.updateNote(edit);
+    expect(updated.tags).toEqual(['sqlite']);
+    expect(store.updateNote(edit)).toEqual(updated);
+    expect(store.search('SQLITE').notes).toHaveLength(2);
+  });
+
+  it('空关键词仅显示最近五条有效手记，排除草稿和回收站内容', () => {
+    const store = open();
+    const savedNotes = Array.from({ length: 8 }, (_, index) =>
+      store.commitDraft(draft({ body: `最近记录 ${index}` })),
+    );
+    mutateDatabase((database) => {
+      for (const [index, saved] of savedNotes.entries()) {
+        database
+          .prepare('UPDATE notes SET created_at = ? WHERE id = ?')
+          .run(`2026-09-20T10:0${index}:00.000Z`, saved.id);
+      }
+      const latest = savedNotes[7];
+      if (!latest) throw new Error('缺少最新测试手记');
+      database
+        .prepare('UPDATE notes SET deleted_at = ? WHERE id = ?')
+        .run(new Date().toISOString(), latest.id);
+    });
+    const homeDraft = draft({ body: '最新写下但尚未提交的草稿' });
+    store.saveDraft(homeDraft);
+    const expectedIds = savedNotes
+      .slice(2, 7)
+      .reverse()
+      .map((saved) => saved.id);
+    for (const query of ['', '  \t\n  ']) {
+      const result = store.search(query);
+      expect(result.notes.map((saved) => saved.id)).toEqual(expectedIds);
+      expect(result.notes).toHaveLength(5);
+      expect(result.notes.some((saved) => saved.id === homeDraft.id)).toBe(false);
+      expect(result.hasMore).toBe(false);
+    }
+  });
+
+  it('搜索结果最多 50 条，并明确还有更多', () => {
+    const store = open();
+    for (let index = 0; index < 51; index += 1)
+      store.commitDraft(draft({ body: `共同关键词 ${index}` }));
+    const result = store.search('共同关键词');
+    expect(result.notes).toHaveLength(50);
+    expect(result.hasMore).toBe(true);
+  });
+});
+
+describe('数据库迁移、备份和恢复保护', () => {
+  it('WAL 数据库快照恢复到干净目录后手记、标签、草稿、软删除完全一致', async () => {
+    const store = open();
+    const deleted = store.commitDraft(draft({ body: '回收站内容', tags: ['关系仍保留'] }));
+    mutateDatabase((database) =>
+      database
+        .prepare('UPDATE notes SET deleted_at = ? WHERE id = ?')
+        .run(new Date().toISOString(), deleted.id),
+    );
+    store.commitDraft(draft({ tags: ['SQLite', '知识'], category: 'misc' }));
+    store.saveDraft(draft({ category: 'done', extrasOpen: true }));
+    const backup = join(temporaryDirectory, 'snapshot.sqlite');
+    await store.backup(backup);
+    const destination = join(temporaryDirectory, 'restored');
+    await restoreDatabaseBackup(backup, destination, migrationsDirectory);
+    expect(open(destination).load()).toEqual(store.load());
+    const restored = new DatabaseSync(join(destination, 'memocraft.sqlite'));
+    try {
+      expect(
+        restored.prepare('SELECT deleted_at FROM notes WHERE id = ?').get(deleted.id)?.deleted_at,
+      ).toBeTypeOf('string');
+      expect(
+        restored
+          .prepare('SELECT count(*) AS count FROM note_tags WHERE note_id = ?')
+          .get(deleted.id)?.count,
+      ).toBe(1);
+    } finally {
+      restored.close();
+    }
+    const existing = readFileSync(backup);
+    await expect(store.backup(backup)).rejects.toThrow('目标已存在');
+    expect(readFileSync(backup)).toEqual(existing);
+    await expect(restoreDatabaseBackup(backup, destination, migrationsDirectory)).rejects.toThrow(
+      '目录必须为空',
+    );
+  });
+
+  it('损坏和未来版本备份被拒绝，保留现有源文件且不会留下半恢复库', async () => {
+    const broken = join(temporaryDirectory, 'broken.sqlite');
+    writeFileSync(broken, 'not sqlite');
+    const brokenDestination = join(temporaryDirectory, 'broken-restore');
+    await expect(
+      restoreDatabaseBackup(broken, brokenDestination, migrationsDirectory),
+    ).rejects.toThrow();
+    expect(readFileSync(broken, 'utf8')).toBe('not sqlite');
+    expect(readdirSync(brokenDestination)).toEqual([]);
+    const store = open();
+    const future = join(temporaryDirectory, 'future.sqlite');
+    await store.backup(future);
+    const connection = new DatabaseSync(future);
+    connection.exec('PRAGMA user_version = 999');
+    connection.close();
+    const futureDestination = join(temporaryDirectory, 'future-restore');
+    await expect(
+      restoreDatabaseBackup(future, futureDestination, migrationsDirectory),
+    ).rejects.toThrow('更新版本');
+    expect(readdirSync(futureDestination)).toEqual([]);
+  });
+
+  it('迁移失败回滚全部本次 DDL 和版本，已有库不被重建', () => {
+    const store = open();
+    const note = store.commitDraft(draft());
+    close(store);
+    const faulty = join(temporaryDirectory, 'migrations');
+    mkdirSync(faulty);
+    writeFileSync(
+      join(faulty, '001_notes.sql'),
+      readFileSync(join(migrationsDirectory, '001_notes.sql')),
+    );
+    writeFileSync(
+      join(faulty, '002_fault.sql'),
+      'CREATE TABLE partial_upgrade (id INTEGER); INSERT INTO nonexistent VALUES (1);',
+    );
+    expect(() => open(join(temporaryDirectory, 'data'), faulty)).toThrow();
+    mutateDatabase((database) => {
+      expect(database.prepare('PRAGMA user_version').get()?.user_version).toBe(1);
+      expect(
+        database.prepare("SELECT name FROM sqlite_master WHERE name = 'partial_upgrade'").get(),
+      ).toBeUndefined();
+    });
+    expect(open().load().notes).toEqual([note]);
+  });
+
+  it('备份在副本上升级受支持的旧版本，保留源备份版本和记录', async () => {
+    const store = open();
+    store.commitDraft(draft({ tags: ['升级样例'] }));
+    const snapshot = store.load();
+    const backup = join(temporaryDirectory, 'old.sqlite');
+    await store.backup(backup);
+    const nextMigrations = join(temporaryDirectory, 'next-migrations');
+    mkdirSync(nextMigrations);
+    writeFileSync(
+      join(nextMigrations, '001_notes.sql'),
+      readFileSync(join(migrationsDirectory, '001_notes.sql')),
+    );
+    writeFileSync(
+      join(nextMigrations, '002_index.sql'),
+      'CREATE INDEX notes_updated_at ON notes(updated_at);',
+    );
+    const destination = join(temporaryDirectory, 'upgraded');
+    await restoreDatabaseBackup(backup, destination, nextMigrations);
+    expect(open(destination, nextMigrations).load()).toEqual(snapshot);
+    const source = new DatabaseSync(backup, { readOnly: true });
+    try {
+      expect(source.prepare('PRAGMA user_version').get()?.user_version).toBe(1);
+    } finally {
+      source.close();
+    }
+  });
+
+  it('已有零字节库不会被当成新库初始化', () => {
+    const directory = join(temporaryDirectory, 'empty-damaged');
+    mkdirSync(directory);
+    const filename = join(directory, 'memocraft.sqlite');
+    writeFileSync(filename, '');
+    expect(() => open(directory)).toThrow('已有数据库文件为空');
+    expect(readFileSync(filename)).toHaveLength(0);
+  });
+
+  it('损坏现有库启动失败后保留原始字节', () => {
+    const directory = join(temporaryDirectory, 'damaged');
+    mkdirSync(directory);
+    const filename = join(directory, 'memocraft.sqlite');
+    writeFileSync(filename, 'irreplaceable damaged data');
+    expect(() => open(directory)).toThrow();
+    expect(readFileSync(filename, 'utf8')).toBe('irreplaceable damaged data');
+  });
+});

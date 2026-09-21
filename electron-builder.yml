@@ -1,0 +1,16 @@
+appId: app.memocraft.desktop
+productName: Memocraft
+directories:
+  output: release
+files:
+  - out/**
+  - package.json
+extraResources:
+  - from: migrations
+    to: migrations
+mac:
+  target: dir
+  category: public.app-category.productivity
+  identity: null
+win:
+  target: nsis
