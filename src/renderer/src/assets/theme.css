@@ -325,12 +325,6 @@ kbd {
   font-weight: 600;
   letter-spacing: -0.01em;
 }
-.nav-brand .brand-sub {
-  display: block;
-  font-size: 12px;
-  color: var(--faint);
-  margin-top: 2px;
-}
 .nav-list {
   position: relative;
   display: flex;
@@ -1048,9 +1042,17 @@ textarea::placeholder {
   inset: 0;
   z-index: 50;
   background: var(--backdrop);
+  transition: opacity var(--dur-2) ease;
+}
+.palette-blur {
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+  pointer-events: none;
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  transition: opacity var(--dur-2) ease;
+  opacity: 1;
+  transition: opacity var(--dur-3) ease-in-out;
 }
 .palette {
   position: fixed;
@@ -1470,16 +1472,21 @@ mark {
 .drawer-transition-leave-to .drawer {
   transform: translateX(104%);
 }
-.palette-transition-enter-active,
-.palette-transition-leave-active {
-  transition: opacity var(--dur-2) ease;
-}
 .palette-transition-enter-active .palette,
 .palette-transition-leave-active .palette {
-  transition: transform var(--dur-3) var(--ease-out);
+  transition:
+    opacity var(--dur-2) ease,
+    transform var(--dur-3) var(--ease-out);
 }
-.palette-transition-enter-from,
-.palette-transition-leave-to {
+.palette-transition-enter-from .palette,
+.palette-transition-leave-to .palette,
+.palette-transition-enter-from .palette-backdrop,
+.palette-transition-leave-to .palette-backdrop {
+  opacity: 0;
+}
+/* 父层保持不透明，模糊层才能始终采样真实页面，避免过渡结束时背景突变。 */
+.palette-transition-enter-from .palette-blur,
+.palette-transition-leave-to .palette-blur {
   opacity: 0;
 }
 .palette-transition-enter-from .palette,
@@ -1520,7 +1527,12 @@ html.theme-switching * {
   transition:
     background-color var(--dur-3) ease,
     color var(--dur-3) ease,
-    border-color var(--dur-3) ease;
+    border-color var(--dur-3) ease,
+    box-shadow var(--dur-3) ease,
+    fill var(--dur-3) ease,
+    stroke var(--dur-3) ease,
+    outline-color var(--dur-3) ease,
+    text-decoration-color var(--dur-3) ease;
 }
 
 @media (prefers-reduced-motion: reduce) {

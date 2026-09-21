@@ -87,6 +87,7 @@ function snippet(note: Note): string {
 
 <template>
   <div>
+    <div class="palette-blur" aria-hidden="true" />
     <div class="palette-backdrop" aria-hidden="true" @click="emit('close')" />
     <section
       ref="panel"

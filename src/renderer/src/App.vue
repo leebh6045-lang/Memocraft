@@ -60,6 +60,11 @@ const tag = ref('');
 const focused = ref(false);
 const theme = ref<'light' | 'dark'>('light');
 const searchOpen = ref(false);
+const reducedMotion = ref(false);
+const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+function syncMotionPreference() {
+  reducedMotion.value = motionPreference.matches;
+}
 const closing = ref(false);
 const closingStore = ref(false);
 const navigating = ref(false);
@@ -156,6 +161,8 @@ async function viewAll() {
 function toggleTheme() {
   clearTimeout(themeTimer);
   document.documentElement.classList.add('theme-switching');
+  // 先让浏览器记录旧主题的计算样式，再切换变量，避免文字先闪到新颜色。
+  void document.documentElement.offsetWidth;
   theme.value = theme.value === 'light' ? 'dark' : 'light';
   document.documentElement.dataset.theme = theme.value;
   themeTimer = setTimeout(() => {
@@ -237,6 +244,8 @@ function handleKey(event: KeyboardEvent) {
 }
 
 onMounted(() => {
+  syncMotionPreference();
+  motionPreference.addEventListener('change', syncMotionPreference);
   try {
     theme.value = localStorage.getItem('memocraft-theme') === 'dark' ? 'dark' : 'light';
   } catch {
@@ -258,6 +267,7 @@ onMounted(() => {
   void library.initialize();
 });
 onBeforeUnmount(() => {
+  motionPreference.removeEventListener('change', syncMotionPreference);
   document.removeEventListener('keydown', handleKey);
   removeCloseListener();
   removeCancelListener();
@@ -273,7 +283,6 @@ onBeforeUnmount(() => {
     <aside class="nav" :inert="focused">
       <div class="nav-brand">
         <div class="brand-name">Memocraft</div>
-        <span class="brand-sub">创忆工坊</span>
       </div>
       <nav class="nav-list" aria-label="主导航">
         <div
@@ -368,7 +377,8 @@ onBeforeUnmount(() => {
       @close="closeDrawer"
       @retry="library.flushNote"
   /></Transition>
-  <Transition name="palette-transition"
+  <!-- 子层分别过渡，父层等待完整时长再移除，避免截断模糊退出。 -->
+  <Transition name="palette-transition" :duration="reducedMotion ? 0 : 320"
     ><SearchPalette
       v-if="searchOpen && api"
       :api="api"
