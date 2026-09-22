@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Memocraft 折叠记忆卡</title>
+  <desc id="desc">四个相连的折纸面构成字母 M，右下方的书签切口象征保存与重访记忆。</desc>
+  <path d="M112 128 184 224v152h-72Z" fill="#202A44" />
+  <path d="M112 128h72l72 96v96l-72-96Z" fill="#D8C4A5" />
+  <path d="m256 224 72-96h72l-72 96-72 96Z" fill="#F4E8D2" />
+  <path d="m328 224 72-96v248l-36-22-36 22Z" fill="#202A44" />
+</svg>

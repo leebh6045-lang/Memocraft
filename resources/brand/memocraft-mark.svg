@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+<title id="title">Memocraft · 折叠记忆卡</title>
+<desc id="desc">四个相连的折纸面构成字母 M，右下方的书签切口象征保存与重访记忆。</desc>
+<!-- 四个纸面可分别选中改色；纯路径，无外部字体、图片或滤镜。 -->
+<path id="left-page" d="M 112,128 184,224 V 376 H 112 Z" fill="#202A44"/>
+<path id="fold-left" d="M 112,128 H 184 L 256,224 V 320 L 184,224 Z" fill="#D8C4A5"/>
+<path id="fold-right" d="M 256,224 328,128 H 400 L 328,224 256,320 Z" fill="#F4E8D2"/>
+<path id="bookmark-page" d="M 328,224 400,128 V 376 L 364,354 328,376 Z" fill="#202A44"/>
+</svg>
