@@ -1,5 +1,6 @@
 appId: app.memocraft.desktop
 productName: Memocraft
+icon: resources/brand/memocraft-app-icon.png
 directories:
   output: release
 files:
@@ -8,6 +9,8 @@ files:
 extraResources:
   - from: migrations
     to: migrations
+  - from: resources/brand
+    to: brand
 mac:
   target: dir
   category: public.app-category.productivity

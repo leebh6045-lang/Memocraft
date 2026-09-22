@@ -1,25 +1,100 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, toValue, watch } from 'vue';
 import MarkdownIt from 'markdown-it';
 import { noteTitle, type Note, type NoteContent } from '../../../domain/note';
+import type { MemocraftApi } from '../../../shared/contracts';
 import CategorySelector from './CategorySelector.vue';
+import NoteImageGallery from './NoteImageGallery.vue';
 import { useModalFocus } from '../composables/useModalFocus';
+import type { NoteImageState } from '../composables/useNoteImages';
 
-const props = defineProps<{ note: Note; status: string; error: string; busy: boolean }>();
+const props = defineProps<{
+  note: Note;
+  status: string;
+  error: string;
+  busy: boolean;
+  bridge: MemocraftApi;
+  images: NoteImageState;
+}>();
 const emit = defineEmits<{ change: [patch: Partial<NoteContent>]; close: []; retry: [] }>();
 const panel = ref<HTMLElement | null>(null);
 const { trapTab } = useModalFocus(panel, '.drawer-text');
 const preview = ref(false);
 const tagsText = ref(props.note.tags.join(', '));
+const imageError = ref('');
+const imageBusy = ref(false);
+// 图集状态经计算属性摊平为普通值：模板只绑定基本类型，避免 ref 与 props 嵌套难以核对。
+const galleryImages = computed(() => toValue(props.images.images));
+const galleryLoading = computed(() => toValue(props.images.loading));
+const galleryStatus = computed(() => toValue(props.images.status));
+const galleryError = computed(() => imageError.value || toValue(props.images.error));
+const galleryBusy = computed(() => imageBusy.value || toValue(props.images.busy));
+
 watch(
   () => props.note.id,
-  () => {
+  (noteId) => {
     tagsText.value = props.note.tags.join(', ');
     preview.value = false;
+    imageError.value = '';
+    // 抽屉挂载即读取图集；换手记时重新读取。
+    void props.images.load(noteId);
   },
+  { immediate: true },
 );
+
+async function addImages() {
+  if (imageBusy.value) return;
+  imageBusy.value = true;
+  imageError.value = '';
+  try {
+    const saved = await props.images.addFromDialog(props.note.id);
+    if (!saved) imageError.value = toValue(props.images.error);
+  } finally {
+    imageBusy.value = false;
+  }
+}
+
+async function pasteImage(image: { bytes: Uint8Array; originalName: string }) {
+  if (imageBusy.value || props.busy) return;
+  imageBusy.value = true;
+  imageError.value = '';
+  try {
+    const saved = await props.images.addFromClipboard(props.note.id, image);
+    if (!saved) imageError.value = toValue(props.images.error);
+  } finally {
+    imageBusy.value = false;
+  }
+}
+
+async function renameImage(imageId: string, displayName: string) {
+  if (!(await props.images.rename(props.note.id, imageId, displayName)))
+    imageError.value = toValue(props.images.error);
+}
+
+async function removeImage(imageId: string) {
+  if (!(await props.images.remove(props.note.id, imageId)))
+    imageError.value = toValue(props.images.error);
+}
+
+/** 抽屉打开时接受剪贴板图片；文本粘贴不受影响，仍由输入框默认行为处理。 */
+function handlePaste(event: ClipboardEvent) {
+  const items = event.clipboardData?.items;
+  if (!items) return;
+  const file = Array.from(items)
+    .find((item) => item.kind === 'file' && item.type.startsWith('image/'))
+    ?.getAsFile();
+  if (!file) return;
+  event.preventDefault();
+  void file
+    .arrayBuffer()
+    .then((buffer) => pasteImage({ bytes: new Uint8Array(buffer), originalName: file.name }))
+    .catch(() => {
+      imageError.value = '未能读取剪贴板图片，请重试或改用「添加图片」。';
+    });
+}
+
 const markdown = new MarkdownIt({ html: false, linkify: false, breaks: true });
-// 首轮不载入远程图片或打开外部页面；Markdown 保留可读文字与代码。
+// 手记正文不解析图片与链接：附图是独立图集，正文保留可读文字与代码。
 markdown.disable(['image', 'link']);
 const renderedBody = computed(() => markdown.render(props.note.body));
 function updateTags(event: Event) {
@@ -36,6 +111,8 @@ function updateTags(event: Event) {
     ],
   });
 }
+onMounted(() => document.addEventListener('paste', handlePaste));
+onBeforeUnmount(() => document.removeEventListener('paste', handlePaste));
 </script>
 
 <template>
@@ -104,6 +181,17 @@ function updateTags(event: Event) {
             <span class="faint">事务与引用功能尚未开放</span>
           </div>
         </div>
+        <NoteImageGallery
+          :images="galleryImages"
+          :loading="galleryLoading"
+          :busy="galleryBusy"
+          :error="galleryError"
+          :status="galleryStatus"
+          :disabled="busy"
+          @add="addImages"
+          @rename="renameImage"
+          @remove="removeImage"
+        />
       </div>
       <footer class="drawer-foot">
         <div>

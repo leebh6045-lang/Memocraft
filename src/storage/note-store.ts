@@ -1,7 +1,6 @@
-import { existsSync, linkSync, mkdirSync, rmSync, statSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
-import { dirname, join } from 'node:path';
-import { backup as sqliteBackup, DatabaseSync, type SQLOutputValue } from 'node:sqlite';
+import { existsSync, mkdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { DatabaseSync, type SQLOutputValue } from 'node:sqlite';
 import {
   NOTE_CATEGORIES,
   type LibrarySnapshot,
@@ -12,7 +11,14 @@ import {
   type NoteSearchResult,
 } from '../domain/note';
 import { AppError } from '../shared/errors';
-import { checkIntegrity, DATABASE_FILENAME, migrate, transaction } from './database';
+import {
+  checkIntegrity,
+  DATABASE_FILENAME,
+  listMigrations,
+  migrate,
+  requireMigrationVersion,
+  transaction,
+} from './database';
 
 type DatabaseRow = Record<string, SQLOutputValue>;
 
@@ -117,6 +123,8 @@ export class NoteStore {
         throw new AppError('STORAGE', '数据库外键保护未能启用。');
       checkIntegrity(this.database);
       migrate(this.database, options.migrationsDirectory);
+      // 迁移后再确认版本，附图等其他存储实现可以直接按当前模式准备语句。
+      requireMigrationVersion(this.database, listMigrations(options.migrationsDirectory).length);
       this.database.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;');
     } catch (error) {
       this.database.close();
@@ -238,29 +246,16 @@ export class NoteStore {
     };
   }
 
-  /** 本轮仅提供数据库快照能力；附件及完整备份包由后续里程碑实现。 */
-  async backup(destination: string): Promise<void> {
-    if (existsSync(destination))
-      throw new AppError('CONFLICT', '备份目标已存在，请选择新文件，避免覆盖已有备份。');
-    mkdirSync(dirname(destination), { recursive: true });
-    const temporary = `${destination}.${randomUUID()}.tmp`;
-    try {
-      await sqliteBackup(this.database, temporary);
-      const verification = new DatabaseSync(temporary, { readOnly: true });
-      try {
-        checkIntegrity(verification);
-      } finally {
-        verification.close();
-      }
-      // 硬链接发布不会覆盖并发创建的目标；临时文件始终位于同一目录/文件系统。
-      linkSync(temporary, destination);
-    } finally {
-      rmSync(temporary, { force: true });
-    }
-  }
-
   close(): void {
     this.database.close();
+  }
+
+  /**
+   * 供同一 worker 内的其他存储实现复用这条唯一连接。
+   * 连接仍由本类负责打开与关闭，调用方不得自行关闭或跨线程传递。
+   */
+  connection(): DatabaseSync {
+    return this.database;
   }
 
   private currentDraft(): NoteDraft | null {

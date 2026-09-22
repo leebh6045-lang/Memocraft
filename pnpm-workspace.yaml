@@ -1,5 +1,9 @@
+# 安装脚本白名单：pnpm 会把未表态的原生依赖视为「被忽略」并以非零码退出，
+# 从而让 pnpm check 这类脚本在执行前就失败，因此这里显式表态。
+# @swc/core 为 devDependency：electron-vite 的类型声明直接 import 它，缺失会导致 vue-tsc 失败。
+# electron-winstaller 仅被 squirrel 目标使用，本项目 Windows 目标为 nsis。
 allowBuilds:
   electron: true
   esbuild: true
-  electron-winstaller: true
   '@swc/core': true
+  electron-winstaller: false

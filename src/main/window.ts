@@ -1,7 +1,16 @@
-import { BrowserWindow, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
+import { app, BrowserWindow, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+export function getApplicationIconPath(): string {
+  return app.isPackaged
+    ? join(process.resourcesPath, 'brand', 'memocraft-app-icon.png')
+    : fileURLToPath(new URL('../../resources/brand/memocraft-app-icon.png', import.meta.url));
+}
+
 export function createWindow(): BrowserWindow {
+  // 开发与打包共用同一份品牌资源；相对当前模块解析，避免依赖启动目录。
+  const applicationIcon = getApplicationIconPath();
   const window = new BrowserWindow({
     width: 1280,
     height: 900,
@@ -9,6 +18,7 @@ export function createWindow(): BrowserWindow {
     minHeight: 700,
     show: false,
     title: 'Memocraft',
+    icon: applicationIcon,
     backgroundColor: '#f5f4f1',
     ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' as const } : {}),
     webPreferences: {

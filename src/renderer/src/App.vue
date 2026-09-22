@@ -8,30 +8,16 @@ import PlannedModule from './pages/PlannedModule.vue';
 import NoteDrawer from './components/NoteDrawer.vue';
 import SearchPalette from './components/SearchPalette.vue';
 import { useLibrary } from './composables/useLibrary';
-import type { MemocraftApi } from '../../shared/contracts';
+import { useNoteImages } from './composables/useNoteImages';
+import { imageApi } from './api/bridge';
+import brandMark from './assets/memocraft-mark.svg';
 
 const api = window.memocraft;
 // 普通浏览器不伪造保存能力；正式应用必须通过 preload 接入本地库。
-const unavailable = async () => ({
-  ok: false as const,
-  error: {
-    code: 'UNAVAILABLE' as const,
-    message: '请在 Memocraft 桌面应用中打开，本地数据连接尚未建立。',
-  },
-});
-const disconnectedApi: MemocraftApi = {
-  load: unavailable,
-  saveDraft: unavailable,
-  commitDraft: unavailable,
-  updateNote: unavailable,
-  search: unavailable,
-  onCloseRequested: () => () => undefined,
-  onCloseCancelled: () => () => undefined,
-  closeReady: () => undefined,
-  closeCancelled: () => undefined,
-  platform: 'mac',
-};
-const library = useLibrary(api ?? disconnectedApi);
+const libraryApi = imageApi(api);
+const library = useLibrary(libraryApi);
+// 图集现场独立于正文编辑现场：改名字或删除图片不会触发手记版本冲突。
+const noteImages = useNoteImages(libraryApi);
 const {
   notes,
   draft,
@@ -282,6 +268,7 @@ onBeforeUnmount(() => {
   <div class="app" :class="{ focus: focused }" :inert="searchOpen || !!editing || closing">
     <aside class="nav" :inert="focused">
       <div class="nav-brand">
+        <img class="brand-mark" :src="brandMark" alt="" aria-hidden="true" />
         <div class="brand-name">Memocraft</div>
       </div>
       <nav class="nav-list" aria-label="主导航">
@@ -373,6 +360,8 @@ onBeforeUnmount(() => {
       :error="noteError"
       :busy="closing"
       :inert="searchOpen || closing"
+      :bridge="libraryApi"
+      :images="noteImages"
       @change="library.changeNote"
       @close="closeDrawer"
       @retry="library.flushNote"
@@ -380,8 +369,8 @@ onBeforeUnmount(() => {
   <!-- 子层分别过渡，父层等待完整时长再移除，避免截断模糊退出。 -->
   <Transition name="palette-transition" :duration="reducedMotion ? 0 : 320"
     ><SearchPalette
-      v-if="searchOpen && api"
-      :api="api"
+      v-if="searchOpen"
+      :bridge="libraryApi"
       :change-version="changeVersion"
       :inert="closing"
       @close="searchOpen = false"

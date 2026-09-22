@@ -8,6 +8,13 @@ const api: MemocraftApi = {
   commitDraft: (draft) => ipcRenderer.invoke(CHANNELS.commitDraft, draft),
   updateNote: (edit) => ipcRenderer.invoke(CHANNELS.updateNote, edit),
   search: (query) => ipcRenderer.invoke(CHANNELS.search, query),
+  loadImages: (noteId) => ipcRenderer.invoke(CHANNELS.loadImages, noteId),
+  addImagesFromDialog: (noteId) => ipcRenderer.invoke(CHANNELS.addImagesFromDialog, noteId),
+  addImageFromClipboard: (noteId, image) =>
+    ipcRenderer.invoke(CHANNELS.addImages, { noteId, images: [image] }),
+  renameImage: (imageId, displayName) =>
+    ipcRenderer.invoke(CHANNELS.renameImage, { imageId, displayName }),
+  deleteImage: (imageId) => ipcRenderer.invoke(CHANNELS.deleteImage, imageId),
   onCloseRequested: (listener) => {
     const handler = (): void => listener();
     ipcRenderer.on(CHANNELS.closeRequested, handler);

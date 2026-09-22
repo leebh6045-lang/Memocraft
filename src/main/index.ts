@@ -2,11 +2,15 @@ import { app, dialog, Menu } from 'electron';
 import { isAbsolute, join } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { StoreClient } from './store-client';
-import { createWindow } from './window';
+import { createWindow, getApplicationIconPath } from './window';
 import { registerStoreIpc } from './ipc/register';
+import { registerImageScheme, serveImageProtocol } from './image-protocol';
 import { coordinateWindowClose } from './close-window';
 import { AppError } from '../shared/errors';
 import { mkdirSync } from 'node:fs';
+
+// 自定义协议必须在应用就绪前登记权限，否则界面无法加载本地图片。
+registerImageScheme();
 
 // 测试同时隔离数据库与 Chromium 外观/缓存，不污染日常开发的窗口偏好。
 const isolatedDirectory = process.env.MEMOCRAFT_DATA_DIR;
@@ -18,6 +22,7 @@ if (isolatedDirectory && isAbsolute(isolatedDirectory)) {
 
 async function start(): Promise<void> {
   await app.whenReady();
+  if (process.platform === 'darwin') app.dock?.setIcon(getApplicationIconPath());
   const testDataDirectory = process.env.MEMOCRAFT_DATA_DIR;
   if (testDataDirectory && !isAbsolute(testDataDirectory))
     throw new Error('隔离数据目录必须使用绝对路径。');
@@ -38,6 +43,8 @@ async function start(): Promise<void> {
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(menu));
   const window = createWindow();
+  // 图片协议只由本窗口所属会话的存储能力应答，不注册到默认会话。
+  serveImageProtocol(window.webContents.session, store);
   const devUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
   const rendererUrl = devUrl
     ? new URL(devUrl).href

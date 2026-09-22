@@ -26,11 +26,14 @@ export default ts.config(
         window: 'readonly',
         document: 'readonly',
         localStorage: 'readonly',
+        crypto: 'readonly',
         HTMLElement: 'readonly',
+        HTMLButtonElement: 'readonly',
         HTMLInputElement: 'readonly',
         HTMLTextAreaElement: 'readonly',
         Event: 'readonly',
         KeyboardEvent: 'readonly',
+        ClipboardEvent: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
       },
@@ -110,6 +113,13 @@ export default ts.config(
       'no-restricted-imports': restricted([
         ['electron', 'vue', '**/renderer/**', '**/main/**', '**/preload/**'],
       ]),
+    },
+  },
+  {
+    files: ['src/main/**/*.ts'],
+    rules: {
+      // 主进程负责生命周期、IPC 与装配：可以调用业务与存储，但不能引入界面代码。
+      'no-restricted-imports': restricted([['vue', '**/renderer/**', '**/preload/**']]),
     },
   },
   {

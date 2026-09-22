@@ -5,7 +5,7 @@ import type { MemocraftApi } from '../../../shared/contracts';
 import AppIcon from './AppIcon.vue';
 import { useModalFocus } from '../composables/useModalFocus';
 
-const props = defineProps<{ api: MemocraftApi; changeVersion: number }>();
+const props = defineProps<{ bridge: MemocraftApi; changeVersion: number }>();
 const emit = defineEmits<{ close: []; open: [note: Note]; all: [] }>();
 const panel = ref<HTMLElement | null>(null);
 const { trapTab } = useModalFocus(panel, 'input');
@@ -20,7 +20,7 @@ let timer: ReturnType<typeof setTimeout> | undefined;
 
 async function search(version: number) {
   try {
-    const response = await props.api.search(query.value);
+    const response = await props.bridge.search(query.value);
     // 旧关键词的迟到响应不更新结果；卸载时也会使当前请求失效。
     if (version !== requestVersion) return;
     if (!response.ok) {

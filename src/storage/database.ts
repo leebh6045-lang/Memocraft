@@ -5,6 +5,27 @@ import { AppError } from '../shared/errors';
 
 export const DATABASE_FILENAME = 'memocraft.sqlite';
 
+/** 迁移文件命名契约：三位数字顺序号加小写名称，迁移管理器与统计共用同一正则。 */
+export const MIGRATION_PATTERN = /^\d{3}_[a-z0-9_]+\.sql$/;
+
+/** 返回按顺序排列的迁移文件名；调用方据此核对连续性、推算模式版本。 */
+export function listMigrations(migrationsDirectory: string): string[] {
+  return readdirSync(migrationsDirectory)
+    .filter((name) => MIGRATION_PATTERN.test(name))
+    .sort();
+}
+
+/**
+ * 确认磁盘上的实际模式版本与迁移文件数量一致。
+ * 迁移管理器在打开库时已执行同样检查；需要按版本分支建表的存储实现再核对一次，
+ * 避免「先按新结构准备语句、后才发现版本不符」的半途失败。
+ */
+export function requireMigrationVersion(database: DatabaseSync, expected: number): void {
+  const version = database.prepare('PRAGMA user_version').get()?.user_version;
+  if (version !== expected)
+    throw new AppError('STORAGE', '数据库模式版本与当前应用不一致，原数据未被修改。');
+}
+
 export function transaction<T>(database: DatabaseSync, operation: () => T): T {
   // 在读改写之前取得写锁；回调须同步完成，不在事务中等待外部操作。
   database.exec('BEGIN IMMEDIATE');
@@ -29,9 +50,7 @@ export function checkIntegrity(database: DatabaseSync): void {
 }
 
 export function migrate(database: DatabaseSync, migrationsDirectory: string): void {
-  const migrations = readdirSync(migrationsDirectory)
-    .filter((name) => /^\d{3}_[a-z0-9_]+\.sql$/.test(name))
-    .sort();
+  const migrations = listMigrations(migrationsDirectory);
   if (migrations.length === 0)
     throw new AppError('STORAGE', '缺少数据库迁移文件，无法安全打开数据。');
   for (const [index, filename] of migrations.entries()) {

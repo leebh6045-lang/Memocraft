@@ -164,6 +164,7 @@ textarea {
   outline-offset: 2px;
   border-radius: 4px;
 }
+/* 仅供屏幕阅读器的文字；图标按钮的可读名称依赖它。 */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -182,7 +183,6 @@ textarea {
 .btn-quiet,
 .btn-ghost,
 .nav-item,
-.chip,
 .card,
 .filter-btn {
   transition:
@@ -317,7 +317,16 @@ kbd {
   min-width: 0;
 }
 .nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 4px 12px 0;
+}
+
+.brand-mark {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
 }
 .nav-brand .brand-name {
   font-family: var(--font-head);
@@ -442,20 +451,8 @@ kbd {
   font-size: 13px;
   margin-top: 4px;
 }
-.page-head .actions {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  flex-shrink: 0;
-}
-.muted {
-  color: var(--muted);
-}
 .faint {
   color: var(--faint);
-}
-.small {
-  font-size: 13px;
 }
 
 /* 专注模式 */
@@ -599,31 +596,6 @@ textarea::placeholder {
 }
 .field.wide {
   grid-column: 1 / -1;
-}
-.chip-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  font-size: 12px;
-  color: var(--muted);
-  background: var(--surface);
-}
-.chip:hover {
-  border-color: var(--border-strong);
-  color: var(--text);
-}
-.chip.on {
-  background: var(--accent-soft);
-  border-color: transparent;
-  color: var(--accent);
 }
 .draft-status {
   min-height: 20px;
@@ -1145,14 +1117,8 @@ textarea::placeholder {
   color: var(--faint);
   flex-wrap: wrap;
 }
-mark {
-  background: var(--accent-soft);
-  color: inherit;
-  border-radius: 2px;
-  padding: 0 1px;
-}
 
-/* 提示条 */
+/* 提示条：为「保存后可查看或撤销」的通知预留，尚未接入组件；不按死代码处理。 */
 .toasts {
   position: fixed;
   left: 50%;
@@ -1255,26 +1221,6 @@ mark {
   min-width: 0;
   width: 100%;
 }
-.field-hint {
-  font-size: 12px;
-  color: var(--muted);
-}
-.error-message {
-  color: var(--danger);
-  font-size: 13px;
-}
-.error-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
-  padding: 12px 16px;
-  border: 1px solid var(--danger);
-  border-radius: var(--radius);
-  color: var(--danger);
-  font-size: 13px;
-}
 .draft-status.success {
   color: var(--c-done);
 }
@@ -1348,11 +1294,6 @@ mark {
 .drawer-text:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 5px;
-}
-.drawer-foot .actions {
-  display: flex;
-  gap: 8px;
-  margin-left: auto;
 }
 .drawer-meta .field {
   width: 100%;

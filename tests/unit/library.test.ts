@@ -9,6 +9,7 @@ import {
   type NoteSearchResult,
 } from '../../src/domain/note';
 import type { MemocraftApi } from '../../src/shared/contracts';
+import type { NoteImageList } from '../../src/domain/note-image';
 import type { Result } from '../../src/shared/errors';
 import { useLibrary } from '../../src/renderer/src/composables/useLibrary';
 
@@ -49,6 +50,22 @@ class ControlledApi implements MemocraftApi {
   }
   async search(): Promise<Result<NoteSearchResult>> {
     return { ok: true, value: { notes: [], hasMore: false } };
+  }
+  // 图集不在本文件覆盖范围内：这里只提供满足契约的空实现。
+  async loadImages(): Promise<Result<NoteImageList>> {
+    return { ok: true, value: { images: [], totalBytes: 0 } };
+  }
+  async addImagesFromDialog(): Promise<Result<NoteImageList>> {
+    return { ok: true, value: { images: [], totalBytes: 0 } };
+  }
+  async addImageFromClipboard(): Promise<Result<NoteImageList>> {
+    return { ok: true, value: { images: [], totalBytes: 0 } };
+  }
+  async renameImage(): Promise<Result<NoteImageList>> {
+    return { ok: true, value: { images: [], totalBytes: 0 } };
+  }
+  async deleteImage(): Promise<Result<NoteImageList>> {
+    return { ok: true, value: { images: [], totalBytes: 0 } };
   }
   onCloseRequested(): () => void {
     return () => undefined;

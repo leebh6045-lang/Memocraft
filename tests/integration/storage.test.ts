@@ -6,11 +6,20 @@ import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { emptyDraft, type NoteDraft } from '../../src/domain/note';
 import { NoteStore } from '../../src/storage/note-store';
-import { restoreDatabaseBackup } from '../../src/storage/restore';
+import { backupLibrary, restoreDatabaseBackup } from '../../src/storage/backup';
+import { NoteImageStore } from '../../src/storage/note-image-store';
 
 const migrationsDirectory = resolve('migrations');
 let temporaryDirectory: string;
 const stores: NoteStore[] = [];
+const imageStores: NoteImageStore[] = [];
+
+/** 附图存储与手记共用同一条连接：备份必须同时覆盖数据库与附件目录。 */
+function withImages(store: NoteStore): NoteImageStore {
+  const images = new NoteImageStore(store.connection(), join(temporaryDirectory, 'data'));
+  imageStores.push(images);
+  return images;
+}
 
 function open(
   directory = join(temporaryDirectory, 'data'),
@@ -151,13 +160,10 @@ describe('真实 SQLite 记录闭环', () => {
       expect(() =>
         database.prepare('INSERT INTO note_tags VALUES (?, ?, ?)').run('missing', 999, 0),
       ).toThrow();
-      expect(
-        database
-          .prepare(
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('topics', 'threads')",
-          )
-          .all(),
-      ).toEqual([]);
+      // 已执行迁移数量与 schema 版本必须一致，避免迁移被静默跳过。
+      expect(database.prepare('PRAGMA user_version').get()?.user_version).toBe(
+        readdirSync(migrationsDirectory).filter((name) => name.endsWith('.sql')).length,
+      );
     });
   });
 
@@ -243,8 +249,8 @@ describe('数据库迁移、备份和恢复保护', () => {
     );
     store.commitDraft(draft({ tags: ['SQLite', '知识'], category: 'misc' }));
     store.saveDraft(draft({ category: 'done', extrasOpen: true }));
-    const backup = join(temporaryDirectory, 'snapshot.sqlite');
-    await store.backup(backup);
+    const backup = join(temporaryDirectory, 'snapshot-backup');
+    await backupLibrary(store, withImages(store), migrationsDirectory, backup);
     const destination = join(temporaryDirectory, 'restored');
     await restoreDatabaseBackup(backup, destination, migrationsDirectory);
     expect(open(destination).load()).toEqual(store.load());
@@ -261,38 +267,48 @@ describe('数据库迁移、备份和恢复保护', () => {
     } finally {
       restored.close();
     }
-    const existing = readFileSync(backup);
-    await expect(store.backup(backup)).rejects.toThrow('目标已存在');
-    expect(readFileSync(backup)).toEqual(existing);
+    const existing = readFileSync(join(backup, 'backup.json'));
+    await expect(
+      backupLibrary(store, withImages(store), migrationsDirectory, backup),
+    ).rejects.toThrow('目标已存在');
+    expect(readFileSync(join(backup, 'backup.json'))).toEqual(existing);
     await expect(restoreDatabaseBackup(backup, destination, migrationsDirectory)).rejects.toThrow(
       '目录必须为空',
     );
   });
 
   it('损坏和未来版本备份被拒绝，保留现有源文件且不会留下半恢复库', async () => {
-    const broken = join(temporaryDirectory, 'broken.sqlite');
-    writeFileSync(broken, 'not sqlite');
+    const broken = join(temporaryDirectory, 'broken-backup');
+    mkdirSync(broken);
+    writeFileSync(join(broken, 'memocraft.sqlite'), 'not sqlite');
     const brokenDestination = join(temporaryDirectory, 'broken-restore');
     await expect(
       restoreDatabaseBackup(broken, brokenDestination, migrationsDirectory),
     ).rejects.toThrow();
-    expect(readFileSync(broken, 'utf8')).toBe('not sqlite');
+    expect(readFileSync(join(broken, 'memocraft.sqlite'), 'utf8')).toBe('not sqlite');
     expect(readdirSync(brokenDestination)).toEqual([]);
     const store = open();
-    const future = join(temporaryDirectory, 'future.sqlite');
-    await store.backup(future);
-    const connection = new DatabaseSync(future);
+    const future = join(temporaryDirectory, 'future-backup');
+    await backupLibrary(store, withImages(store), migrationsDirectory, future);
+    const connection = new DatabaseSync(join(future, 'memocraft.sqlite'));
     connection.exec('PRAGMA user_version = 999');
     connection.close();
     const futureDestination = join(temporaryDirectory, 'future-restore');
     await expect(
       restoreDatabaseBackup(future, futureDestination, migrationsDirectory),
-    ).rejects.toThrow('更新版本');
+    ).rejects.toThrow('模式版本');
     expect(readdirSync(futureDestination)).toEqual([]);
   });
 
   it('迁移失败回滚全部本次 DDL 和版本，已有库不被重建', () => {
-    const store = open();
+    // 先造出「只到 001」的旧库，再让 002 失败，验证升级失败不会留下半套结构。
+    const only001 = join(temporaryDirectory, 'migrations-001');
+    mkdirSync(only001);
+    writeFileSync(
+      join(only001, '001_notes.sql'),
+      readFileSync(join(migrationsDirectory, '001_notes.sql')),
+    );
+    const store = open(join(temporaryDirectory, 'data'), only001);
     const note = store.commitDraft(draft());
     close(store);
     const faulty = join(temporaryDirectory, 'migrations');
@@ -305,22 +321,33 @@ describe('数据库迁移、备份和恢复保护', () => {
       join(faulty, '002_fault.sql'),
       'CREATE TABLE partial_upgrade (id INTEGER); INSERT INTO nonexistent VALUES (1);',
     );
-    expect(() => open(join(temporaryDirectory, 'data'), faulty)).toThrow();
+    writeFileSync(join(faulty, '003_missing.sql'), 'CREATE TABLE never_reached (id INTEGER);');
+    expect(
+      () =>
+        new NoteStore({
+          dataDirectory: join(temporaryDirectory, 'data'),
+          migrationsDirectory: faulty,
+        }),
+    ).toThrow();
     mutateDatabase((database) => {
       expect(database.prepare('PRAGMA user_version').get()?.user_version).toBe(1);
       expect(
         database.prepare("SELECT name FROM sqlite_master WHERE name = 'partial_upgrade'").get(),
       ).toBeUndefined();
+      expect(
+        database.prepare("SELECT name FROM sqlite_master WHERE name = 'never_reached'").get(),
+      ).toBeUndefined();
     });
-    expect(open().load().notes).toEqual([note]);
+    // 失败的迁移不能破坏原库：用原迁移目录仍能正常打开并读到原记录。
+    expect(open(join(temporaryDirectory, 'data')).load().notes).toEqual([note]);
   });
 
   it('备份在副本上升级受支持的旧版本，保留源备份版本和记录', async () => {
     const store = open();
     store.commitDraft(draft({ tags: ['升级样例'] }));
     const snapshot = store.load();
-    const backup = join(temporaryDirectory, 'old.sqlite');
-    await store.backup(backup);
+    const backup = join(temporaryDirectory, 'old-backup');
+    await backupLibrary(store, withImages(store), migrationsDirectory, backup);
     const nextMigrations = join(temporaryDirectory, 'next-migrations');
     mkdirSync(nextMigrations);
     writeFileSync(
@@ -328,15 +355,26 @@ describe('数据库迁移、备份和恢复保护', () => {
       readFileSync(join(migrationsDirectory, '001_notes.sql')),
     );
     writeFileSync(
-      join(nextMigrations, '002_index.sql'),
+      join(nextMigrations, '002_note_images.sql'),
+      readFileSync(join(migrationsDirectory, '002_note_images.sql')),
+    );
+    writeFileSync(
+      join(nextMigrations, '003_index.sql'),
       'CREATE INDEX notes_updated_at ON notes(updated_at);',
     );
     const destination = join(temporaryDirectory, 'upgraded');
     await restoreDatabaseBackup(backup, destination, nextMigrations);
     expect(open(destination, nextMigrations).load()).toEqual(snapshot);
-    const source = new DatabaseSync(backup, { readOnly: true });
+    const source = new DatabaseSync(join(backup, 'memocraft.sqlite'), { readOnly: true });
     try {
-      expect(source.prepare('PRAGMA user_version').get()?.user_version).toBe(1);
+      expect(source.prepare('PRAGMA user_version').get()?.user_version).toBe(2);
+      // 恢复在副本上推进到当前迁移数，源备份保持原版本。
+      const upgraded = new DatabaseSync(join(destination, 'memocraft.sqlite'), { readOnly: true });
+      try {
+        expect(upgraded.prepare('PRAGMA user_version').get()?.user_version).toBe(3);
+      } finally {
+        upgraded.close();
+      }
     } finally {
       source.close();
     }

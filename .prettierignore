@@ -1,16 +1,7 @@
 .local/
-/历史文档/
-/初步想法.md
-/思维收束.md
-/需求规格说明书-v1.md
-/v1开工总纲.md
-/技术栈与工具清单.md
-/项目结构.md
-/开发准则.md
-/SQLite说明.md
-AGENTS.md
 /docs/thinking/
 /docs/历史文档/
+AGENTS.md
 node_modules/
 .pnpm-store/
 out/

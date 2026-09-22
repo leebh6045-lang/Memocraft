@@ -5,9 +5,11 @@ import {
   type NoteDraft,
   type NoteEdit,
 } from '../domain/note';
+import { MAX_IMAGE_BYTES, MAX_IMAGE_NAME_LENGTH, type ImageInput } from '../domain/note-image';
 import { AppError } from '../shared/errors';
 
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
+const MAX_IMAGE_COUNT_PER_REQUEST = 20;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function invalid(message: string): never {
@@ -83,4 +85,58 @@ export function validateNoteEdit(input: unknown): NoteEdit {
 export function validateSearch(input: unknown): string {
   if (typeof input !== 'string' || input.length > 500) invalid('搜索词不能超过 500 个字符。');
   return input.trim();
+}
+
+/** IPC 只传结构化克隆数据：Uint8Array 正常通过，普通数字数组也接受并归一化。 */
+function imageBytes(input: unknown): Uint8Array {
+  if (input instanceof Uint8Array) return input;
+  if (
+    Array.isArray(input) &&
+    input.every((byte) => typeof byte === 'number' && byte >= 0 && byte <= 255)
+  )
+    return Uint8Array.from(input as number[]);
+  invalid('图片数据格式不正确，请重新选择或粘贴。');
+}
+
+function imageInput(input: unknown): ImageInput {
+  const value = record(input);
+  const bytes = imageBytes(value.bytes);
+  if (bytes.byteLength === 0) invalid('图片内容为空，请重新选择或粘贴。');
+  if (bytes.byteLength > MAX_IMAGE_BYTES)
+    invalid(`单张图片不能超过 ${Math.round(MAX_IMAGE_BYTES / 1024 / 1024)} MB。`);
+  if (value.originalName !== undefined && typeof value.originalName !== 'string')
+    invalid('图片名称格式不正确。');
+  return { bytes, originalName: (value.originalName ?? '').slice(0, 300) };
+}
+
+export function validateAddImages(input: unknown): { noteId: string; images: ImageInput[] } {
+  const value = record(input);
+  if (!Array.isArray(value.images) || value.images.length === 0) invalid('请选择要添加的图片。');
+  if (value.images.length > MAX_IMAGE_COUNT_PER_REQUEST)
+    invalid(`一次最多添加 ${MAX_IMAGE_COUNT_PER_REQUEST} 张图片。`);
+  return { noteId: identifier(value.noteId), images: value.images.map(imageInput) };
+}
+
+export function validateImageId(input: unknown): string {
+  if (typeof input !== 'string' || !UUID.test(input))
+    invalid('图片标识不正确，请重新打开手记后重试。');
+  return input;
+}
+
+export function validateNoteId(input: unknown): string {
+  return identifier(input);
+}
+
+export function validateImageName(input: unknown): string {
+  if (typeof input !== 'string' || input.length > MAX_IMAGE_NAME_LENGTH)
+    invalid(`图片名称不能超过 ${MAX_IMAGE_NAME_LENGTH} 个字符。`);
+  return input.trim();
+}
+
+export function validateImageRename(input: unknown): { imageId: string; displayName: string } {
+  const value = record(input);
+  return {
+    imageId: validateImageId(value.imageId),
+    displayName: validateImageName(value.displayName),
+  };
 }
