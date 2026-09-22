@@ -1,6 +1,6 @@
 {
   "name": "memocraft",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "本地优先的个人知识库",
   "author": "Memocraft",
@@ -23,6 +23,7 @@
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
     "check:full": "pnpm check && pnpm typecheck:plain && pnpm build && pnpm test:runtime",
     "package:dir": "pnpm build && electron-builder --dir",
+    "package:dmg": "pnpm build && electron-builder --mac dmg",
     "test:runtime": "node scripts/run-runtime-smoke.mjs"
   },
   "dependencies": {

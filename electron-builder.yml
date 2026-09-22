@@ -12,8 +12,14 @@ extraResources:
   - from: resources/brand
     to: brand
 mac:
-  target: dir
+  # dir 供本机与桌面流程验证使用；dmg 是给人安装的产物。
+  # artifactName 固定为「产品名-版本-架构.扩展名」，升级与排障时容易辨认。
+  target:
+    - dir
+    - dmg
+  artifactName: ${productName}-${version}-${arch}.${ext}
   category: public.app-category.productivity
+  # 本机自用：不做 Developer ID 签名与公证，首次打开需要手动允许。
   identity: null
 win:
   target: nsis
