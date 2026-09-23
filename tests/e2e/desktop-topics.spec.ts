@@ -53,14 +53,28 @@ test('真实桌面：新建归纳、多重收录、抽屉反查与移出', async
       .fill('事务、备份与查询');
     await createDialog.getByRole('button', { name: '创建', exact: true }).click();
     await expect(page.getByRole('heading', { name: '本地数据库', exact: true })).toBeVisible();
-    // 详情页说明就地可编辑：改动后自动保存并给出状态反馈。
-    await page
+    // 基础信息在右侧抽屉里编辑：改动后自动保存并给出状态反馈。
+    await page.getByRole('button', { name: '编辑基础信息' }).click();
+    const editDrawer = page.getByRole('dialog', { name: '编辑基础信息' });
+    await expect(editDrawer).toBeVisible();
+    await editDrawer
       .getByRole('textbox', { name: '说明', exact: true })
       .fill('事务、备份与查询（已核对）');
-    await expect(page.locator('.draft-status')).toContainText('已保存', { timeout: 8000 });
-    await expect(page.getByRole('textbox', { name: '说明', exact: true })).toHaveValue(
-      '事务、备份与查询（已核对）',
-    );
+    await expect(editDrawer.locator('.draft-status')).toContainText('已保存', { timeout: 8000 });
+    // 关掉再打开，说明应已落库。
+    await editDrawer.getByRole('button', { name: /^关闭/ }).click();
+    await expect(editDrawer).toHaveCount(0);
+    await page.getByRole('button', { name: '编辑基础信息' }).click();
+    await expect(
+      page
+        .getByRole('dialog', { name: '编辑基础信息' })
+        .getByRole('textbox', { name: '说明', exact: true }),
+    ).toHaveValue('事务、备份与查询（已核对）');
+    await page
+      .getByRole('dialog', { name: '编辑基础信息' })
+      .getByRole('button', { name: /^关闭/ })
+      .click();
+    await expect(page.getByRole('dialog', { name: '编辑基础信息' })).toHaveCount(0);
 
     // 第二个归纳：从列表页新建。
     await page
@@ -83,7 +97,9 @@ test('真实桌面：新建归纳、多重收录、抽屉反查与移出', async
 
     // 收录第一条手记：选择器里勾选后一次提交。
     // 详情页页头与空状态各有一个同名入口，这里固定用页头那个。
-    const collectButton = page.locator('.page-head').getByRole('button', { name: '收录已有手记' });
+    const collectButton = page
+      .locator('.detail-head')
+      .getByRole('button', { name: '收录已有手记' });
     const collectInto = async (noteTitleText: string) => {
       await collectButton.click();
       const picker = page.getByRole('dialog', { name: '收录手记' });

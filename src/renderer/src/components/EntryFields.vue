@@ -4,7 +4,8 @@
  * 新建（时间线输入区）与编辑（对话框）共用同一份字段，避免两处规则漂移。
  */
 defineProps<{
-  summary: string;
+  /** 描述字段在时间线的抽屉里由外层提供，这里可以不传。 */
+  summary?: string;
   occurredAt: string;
   body: string;
   tagsText: string;

@@ -48,21 +48,28 @@ test('真实桌面：长期事务、动态时间线与引用反查', async () =>
       .getByRole('textbox', { name: '标题', exact: true })
       .fill('个人服务器搭建与维护');
     await createDialog.getByRole('button', { name: '创建', exact: true }).click();
-    await expect(page.getByRole('textbox', { name: '事务标题' })).toHaveValue(
-      '个人服务器搭建与维护',
-    );
+    // 详情页标题只读呈现（状态跟在标题后），编辑入口收进右侧抽屉。
+    await expect(page.locator('.detail-title')).toContainText('个人服务器搭建与维护');
 
-    // 概况与说明就地自动保存。
-    await page
+    // 基础信息在抽屉里编辑：改动后自动保存并给出状态反馈。
+    await page.getByRole('button', { name: '编辑基础信息' }).click();
+    const editDrawer = page.getByRole('dialog', { name: '编辑基础信息' });
+    await expect(editDrawer).toBeVisible();
+    await editDrawer
       .getByRole('textbox', { name: /当前概况/ })
       .fill('Ubuntu 24.04，Nginx 已上线两个站点。');
-    await expect(page.locator('.draft-status')).toContainText('已保存', { timeout: 8000 });
+    await expect(editDrawer.locator('.draft-status')).toContainText('已保存', { timeout: 8000 });
+    await editDrawer.getByRole('button', { name: /^关闭/ }).click();
+    await expect(editDrawer).toHaveCount(0);
 
     // 第一条动态：新建时即引用那条手记。
-    const composer = page.getByRole('textbox', { name: '动态描述', exact: true });
-    await composer.click();
-    await composer.fill('排查并修复了证书链不完整的问题');
-    await page
+    await page.getByRole('button', { name: '＋ 记录动态' }).click();
+    const entryDrawer = page.getByRole('dialog', { name: '记录动态' });
+    await expect(entryDrawer).toBeVisible();
+    await entryDrawer
+      .getByRole('textbox', { name: '动态描述（必填）' })
+      .fill('排查并修复了证书链不完整的问题');
+    await entryDrawer
       .getByRole('textbox', { name: '详细内容（可选，Markdown）' })
       .fill('原因是只配了 cert.pem。');
     await page.getByRole('button', { name: '＋ 引用手记' }).click();
@@ -71,15 +78,18 @@ test('真实桌面：长期事务、动态时间线与引用反查', async () =>
     await picker.getByRole('checkbox').first().check();
     await picker.getByRole('button', { name: '收录', exact: true }).click();
     await expect(picker).toHaveCount(0);
-    await page.getByRole('button', { name: '记录动态', exact: true }).click();
+    await entryDrawer.getByRole('button', { name: '记录动态' }).click();
     await expect(page.locator('.timeline .entry')).toHaveCount(1);
     await expect(page.locator('.toast').filter({ hasText: '已记录动态' })).toBeVisible();
 
     // 补录一条过去发生的动态：时间线默认最近在前，补录项应排在后面。
-    await composer.click();
-    await composer.fill('购买 VPS 并初始化系统');
-    await page.getByRole('textbox', { name: '发生时间' }).fill('2026-08-01T10:00');
-    await page.getByRole('button', { name: '记录动态', exact: true }).click();
+    await page.getByRole('button', { name: '＋ 记录动态' }).click();
+    const backfillDrawer = page.getByRole('dialog', { name: '记录动态' });
+    await backfillDrawer
+      .getByRole('textbox', { name: '动态描述（必填）' })
+      .fill('购买 VPS 并初始化系统');
+    await backfillDrawer.getByRole('textbox', { name: '发生时间' }).fill('2026-08-01T10:00');
+    await backfillDrawer.getByRole('button', { name: '记录动态' }).click();
     await expect(page.locator('.timeline .entry')).toHaveCount(2);
     await expect(page.locator('.timeline .entry h4').first()).toContainText('排查并修复了证书链');
     await expect(page.locator('.timeline .entry h4').last()).toContainText('购买 VPS');
@@ -118,9 +128,7 @@ test('真实桌面：长期事务、动态时间线与引用反查', async () =>
       .fill('证书链排查方法（已更新：同时检查 fullchain.pem）');
     await expect(drawer.getByText('已保存', { exact: true })).toBeVisible();
     await refs.getByRole('button', { name: /排查并修复了证书链/ }).click();
-    await expect(page.getByRole('textbox', { name: '事务标题' })).toHaveValue(
-      '个人服务器搭建与维护',
-    );
+    await expect(page.locator('.detail-title')).toContainText('个人服务器搭建与维护');
     // 详情打开后时间线是异步读取的，先等条目渲染再断言内容。
     await expect(page.locator('.timeline .entry')).toHaveCount(2);
     await expect(page.locator('.timeline .entry h4').first()).toContainText('排查并修复了证书链');

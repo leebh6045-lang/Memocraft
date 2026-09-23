@@ -6,7 +6,7 @@ import AppDialog from '../components/AppDialog.vue';
 import NoteCard from '../components/NoteCard.vue';
 import NotePickerDialog from '../components/NotePickerDialog.vue';
 import { formatTime } from '../format-time';
-import AppIcon from '../components/AppIcon.vue';
+import SideDrawer from '../components/SideDrawer.vue';
 import type { TopicState } from '../composables/useTopics';
 import type { TrashState } from '../composables/useTrash';
 
@@ -40,6 +40,8 @@ const creating = ref(false);
 const draft = ref(emptyTopicDraft());
 const duplicateHint = ref('');
 const pickingFor = ref<string | null>(null);
+/** 基础信息在右侧抽屉里编辑，页面只读展示标题。 */
+const editOpen = ref(false);
 
 const title = ref('');
 const description = ref('');
@@ -74,6 +76,7 @@ function showDetail(topicId: string): void {
 }
 
 function backToList(): void {
+  editOpen.value = false;
   view.value = 'list';
   activeId.value = null;
   saveStatus.value = '';
@@ -261,50 +264,20 @@ function writeInTopic(): void {
 
     <template v-else-if="activeTopic">
       <button class="crumb" @click="backToList"><span aria-hidden="true">‹</span> 知识归纳</button>
-      <header class="page-head">
-        <div class="topic-head">
-          <h1 :style="{ viewTransitionName: `topic-${activeTopic.id}` }">
-            {{ activeTopic.title }}
+      <div class="detail-head">
+        <div class="head-main">
+          <h1 class="detail-title">
+            <span :style="{ viewTransitionName: `topic-${activeTopic.id}` }">{{
+              activeTopic.title
+            }}</span>
           </h1>
-          <div class="draft-status" :class="{ error: saveError }" aria-live="polite">
-            <span v-if="saveError">{{ saveError }}</span>
-            <span v-else-if="saveStatus">{{ saveStatus }}</span>
-          </div>
         </div>
         <div class="actions">
-          <button
-            class="btn-quiet btn-danger"
-            :disabled="props.busy"
-            title="移到回收站"
-            aria-label="移到回收站"
-            @click="removeTopic(activeTopic.id)"
-          >
-            <AppIcon name="trash" class="icon-s" />
-          </button>
-          <button class="btn" :disabled="props.busy" @click="pickingFor = activeTopic.id">
+          <button class="btn" :disabled="props.busy" @click="editOpen = true">编辑基础信息</button>
+          <button class="btn-primary" :disabled="props.busy" @click="pickingFor = activeTopic.id">
             收录已有手记
           </button>
         </div>
-      </header>
-
-      <div class="topic-fields">
-        <label class="field"
-          >标题<input
-            :value="title"
-            :disabled="props.busy"
-            maxlength="300"
-            @input="title = ($event.target as HTMLInputElement).value"
-        /></label>
-        <label class="field wide"
-          >说明<textarea
-            :value="description"
-            :disabled="props.busy"
-            rows="2"
-            maxlength="2000"
-            placeholder="这个归纳在收集什么"
-            @input="description = ($event.target as HTMLTextAreaElement).value"
-          />
-        </label>
       </div>
 
       <div v-if="!activeNotes.length" class="empty">
@@ -379,6 +352,40 @@ function writeInTopic(): void {
       @confirm="confirmPick"
       @close="pickingFor = null"
     />
+    <SideDrawer v-if="activeTopic" :open="editOpen" title="编辑基础信息" @close="editOpen = false">
+      <label class="field"
+        >标题<input
+          data-autofocus
+          :value="title"
+          :disabled="props.busy"
+          maxlength="300"
+          @input="title = ($event.target as HTMLInputElement).value"
+      /></label>
+      <label class="field"
+        >说明<textarea
+          :value="description"
+          :disabled="props.busy"
+          rows="4"
+          maxlength="2000"
+          placeholder="这个归纳在收集什么"
+          @input="description = ($event.target as HTMLTextAreaElement).value"
+        />
+      </label>
+      <p class="draft-status" :class="{ error: saveError }" aria-live="polite">
+        <span v-if="saveError">{{ saveError }}</span>
+        <span v-else-if="saveStatus">{{ saveStatus }}</span>
+      </p>
+      <template #footer>
+        <span>改动会自动保存</span>
+        <button
+          class="btn-quiet btn-danger"
+          :disabled="props.busy"
+          @click="removeTopic(activeTopic.id)"
+        >
+          移到回收站
+        </button>
+      </template>
+    </SideDrawer>
   </section>
 </template>
 
@@ -387,17 +394,6 @@ function writeInTopic(): void {
   display: flex;
   gap: 6px;
   align-items: center;
-}
-.topic-head {
-  min-width: 0;
-}
-.topic-fields {
-  display: grid;
-  gap: 10px 14px;
-  margin-bottom: 22px;
-}
-.topic-fields .wide {
-  grid-column: 1 / -1;
 }
 .topic-note {
   position: relative;

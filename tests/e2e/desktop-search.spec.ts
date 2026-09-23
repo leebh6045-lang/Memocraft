@@ -66,14 +66,22 @@ test('真实桌面：全对象搜索、命中高亮与结果定位', async () =>
     const threadDialog = page.getByRole('dialog', { name: '新建事务' });
     await threadDialog.getByRole('textbox', { name: '标题', exact: true }).fill('检索事务样例');
     await threadDialog.getByRole('button', { name: '创建', exact: true }).click();
-    await page.getByRole('textbox', { name: /当前概况/ }).fill('概况里写着 证书自动续期 的状态');
-    const composer = page.getByRole('textbox', { name: '动态描述', exact: true });
-    await composer.click();
-    await composer.fill('检索动态样例');
-    await page
+    // 基础信息在抽屉里填写，动态也在抽屉里记录。
+    await page.getByRole('button', { name: '编辑基础信息' }).click();
+    const editDrawer = page.getByRole('dialog', { name: '编辑基础信息' });
+    await editDrawer
+      .getByRole('textbox', { name: /当前概况/ })
+      .fill('概况里写着 证书自动续期 的状态');
+    await expect(editDrawer.locator('.draft-status')).toContainText('已保存', { timeout: 8000 });
+    await editDrawer.getByRole('button', { name: /^关闭/ }).click();
+    await expect(editDrawer).toHaveCount(0);
+    await page.getByRole('button', { name: '＋ 记录动态' }).click();
+    const entryDrawer = page.getByRole('dialog', { name: '记录动态' });
+    await entryDrawer.getByRole('textbox', { name: '动态描述（必填）' }).fill('检索动态样例');
+    await entryDrawer
       .getByRole('textbox', { name: '详细内容（可选，Markdown）' })
       .fill('错误码 NET::ERR_CERT_AUTHORITY_INVALID');
-    await page.getByRole('button', { name: '记录动态', exact: true }).click();
+    await entryDrawer.getByRole('button', { name: '记录动态' }).click();
     await expect(page.locator('.timeline .entry')).toHaveCount(1);
 
     // 归档后照常可检索。
@@ -152,7 +160,7 @@ test('真实桌面：全对象搜索、命中高亮与结果定位', async () =>
     await openSearch();
     await input.fill('检索事务样例');
     await options.filter({ hasText: '检索事务样例' }).first().click();
-    await expect(page.getByRole('textbox', { name: '事务标题' })).toHaveValue('检索事务样例');
+    await expect(page.locator('.detail-title')).toContainText('检索事务样例');
     await expect(page.locator('.status-pill').first()).toContainText('已归档');
 
     // 打开动态结果：定位到所属事务并高亮那条动态。

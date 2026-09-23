@@ -884,6 +884,50 @@ textarea::placeholder {
   }
 }
 
+/* 详情页头：标题块与操作区分列左右，窄窗口时操作区整行换到标题下方。
+   编辑入口与删除都在抽屉里，页头只保留少量动作，避免按钮被挤出可视区。 */
+.detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px 28px;
+  margin-bottom: 22px;
+}
+.detail-head .head-main {
+  flex: 1;
+  min-width: 0;
+}
+.detail-head .actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.detail-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+/* 抽屉标题：说明这次编辑的对象，必要时带上所属内容 */
+.drawer-kind {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.drawer-hint {
+  font-size: 12px;
+  color: var(--faint);
+}
+@media (max-width: 1100px) {
+  .detail-head .actions {
+    width: 100%;
+  }
+}
+
 /* 说明条与行式列表：回收站等辅助页面使用，与卡片网格区分开。 */
 .notebar {
   display: flex;
@@ -1181,6 +1225,12 @@ mark {
 }
 
 /* 抽屉：手记详情 */
+/* 遮罩与面板的公共父层：进出场动效挂在它上面，遮罩与面板才能一起淡出。 */
+.drawer-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
 .drawer-backdrop {
   position: fixed;
   inset: 0;

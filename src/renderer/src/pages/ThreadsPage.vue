@@ -12,6 +12,7 @@ import AppIcon from '../components/AppIcon.vue';
 import EntryFields from '../components/EntryFields.vue';
 import NoteCard from '../components/NoteCard.vue';
 import NotePickerDialog from '../components/NotePickerDialog.vue';
+import SideDrawer from '../components/SideDrawer.vue';
 import { formatFullTime, formatTime, fromDateTimeInput, toDateTimeInput } from '../format-time';
 import { renderMarkdown } from '../markdown';
 import type { ThreadState } from '../composables/useThreads';
@@ -64,7 +65,9 @@ let applyingRemote = false;
 // 新建动态输入区
 const composer = ref({ summary: '', occurredAt: '', body: '', tagsText: '' });
 const composerNoteIds = ref<string[]>([]);
-const composerOpen = ref(false);
+/** 基础信息与记动态都在右侧抽屉里完成，页面本身只读。 */
+const editOpen = ref(false);
+const entryOpen = ref(false);
 const submittingEntry = ref(false);
 const composerError = ref('');
 
@@ -91,7 +94,8 @@ function showDetail(threadId: string): void {
     activeId.value = threadId;
     view.value = 'detail';
     composerNoteIds.value = [];
-    composerOpen.value = false;
+    entryOpen.value = false;
+    editOpen.value = false;
     composer.value = {
       summary: '',
       occurredAt: toDateTimeInput(new Date().toISOString()),
@@ -102,7 +106,9 @@ function showDetail(threadId: string): void {
     void refreshEntries();
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
-  swap();
+  // 与知识归纳一致：卡片标题与详情标题作为共享元素连续移动。
+  if (document.startViewTransition && !reducedMotion) document.startViewTransition(swap);
+  else swap();
 }
 
 function backToList(): void {
@@ -296,7 +302,7 @@ async function submitEntry(): Promise<void> {
       tagsText: '',
     };
     composerNoteIds.value = [];
-    composerOpen.value = false;
+    entryOpen.value = false;
     await refreshEntries();
     await props.state.load();
     emit('notify', { message: '已记录动态' });
@@ -449,127 +455,55 @@ onBeforeUnmount(() => clearTimeout(saveTimer));
 
     <template v-else-if="activeThread">
       <button class="crumb" @click="backToList"><span aria-hidden="true">‹</span> 长期事务</button>
-      <header class="page-head">
-        <div class="thread-head">
-          <h1>
-            <input
-              class="thread-title"
-              aria-label="事务标题"
-              :value="title"
-              :disabled="props.busy"
-              maxlength="300"
-              @input="title = ($event.target as HTMLInputElement).value"
-            />
+      <div class="detail-head">
+        <div class="head-main">
+          <h1 class="detail-title">
+            <span :style="{ viewTransitionName: `thread-${activeThread.id}` }">{{
+              activeThread.title
+            }}</span>
             <span class="status-pill" :class="{ active: activeThread.status === 'active' }">{{
               THREAD_STATUS_LABELS[activeThread.status]
             }}</span>
           </h1>
-          <input
-            class="thread-desc"
-            aria-label="事务说明"
-            :value="description"
-            :disabled="props.busy"
-            maxlength="2000"
-            placeholder="一句话说明这件事"
-            @input="description = ($event.target as HTMLInputElement).value"
-          />
-          <div class="draft-status" :class="{ error: saveError }" aria-live="polite">
-            <span v-if="saveError">{{ saveError }}</span>
-            <span v-else-if="saveStatus">{{ saveStatus }}</span>
-          </div>
         </div>
         <div class="actions">
-          <button
-            class="btn-quiet btn-danger"
-            :disabled="props.busy"
-            title="移到回收站"
-            aria-label="移到回收站"
-            @click="removeThread(activeThread.id)"
-          >
-            <AppIcon name="trash" class="icon-s" />
-          </button>
-          <button class="btn" :disabled="props.busy" @click="toggleArchive">
+          <button class="btn" :disabled="props.busy" @click="editOpen = true">编辑基础信息</button>
+          <button class="btn-quiet" :disabled="props.busy" @click="toggleArchive">
             {{ activeThread.status === 'active' ? '归档' : '重新启用' }}
           </button>
         </div>
-      </header>
-
-      <div class="summary-box">
-        <label for="thread-summary">当前概况 · 由你维护，动态只记录历史</label>
-        <textarea
-          id="thread-summary"
-          :value="summary"
-          :disabled="props.busy"
-          maxlength="4000"
-          rows="2"
-          placeholder="现在处于什么状态"
-          @input="summary = ($event.target as HTMLTextAreaElement).value"
-        />
       </div>
 
-      <section v-if="activeThread.status === 'active'" class="composer">
-        <input
-          class="composer-summary"
-          aria-label="动态描述"
-          :value="composer.summary"
-          :disabled="props.busy || submittingEntry"
-          maxlength="300"
-          placeholder="记一条动态：做了什么、想到什么、决定了什么…"
-          @input="composer.summary = ($event.target as HTMLInputElement).value"
-          @focus="composerOpen = true"
-        />
-        <div v-show="composerOpen" class="composer-more">
-          <EntryFields
-            v-model:summary="composer.summary"
-            v-model:occurred-at="composer.occurredAt"
-            v-model:body="composer.body"
-            v-model:tags-text="composer.tagsText"
-            :disabled="props.busy || submittingEntry"
-            :show-summary="false"
-          />
-          <div class="composer-row">
-            <div class="chip-row">
-              <span v-for="noteId in composerNoteIds" :key="noteId" class="chip on"
-                ><button class="chip-label" @click="emit('open-note', noteId)">
-                  {{ noteById(noteId)?.title || '无标题手记' }}</button
-                ><button
-                  class="chip-x"
-                  aria-label="取消引用"
-                  @click="composerNoteIds = composerNoteIds.filter((id) => id !== noteId)"
-                >
-                  ×
-                </button></span
-              >
-              <button class="inline-add" @click="picking = 'composer'">＋ 引用手记</button>
-            </div>
-            <button class="btn-primary" :disabled="submittingEntry" @click="submitEntry">
-              {{ submittingEntry ? '正在记录…' : '记录动态' }}
+      <div class="timeline-head">
+        <div class="head-left">
+          <h2>动态 {{ activeThread.entryCount }}</h2>
+          <div class="seg seg-sm">
+            <button
+              type="button"
+              role="radio"
+              :aria-checked="order === 'newest'"
+              @click="switchOrder('newest')"
+            >
+              最近在前
+            </button>
+            <button
+              type="button"
+              role="radio"
+              :aria-checked="order === 'oldest'"
+              @click="switchOrder('oldest')"
+            >
+              最早在前
             </button>
           </div>
         </div>
-        <p v-if="composerError" class="composer-error" role="alert">{{ composerError }}</p>
-      </section>
-
-      <div class="timeline-head">
-        <h2>动态 {{ activeThread.entryCount }}</h2>
-        <div class="seg seg-sm">
-          <button
-            type="button"
-            role="radio"
-            :aria-checked="order === 'newest'"
-            @click="switchOrder('newest')"
-          >
-            最近在前
-          </button>
-          <button
-            type="button"
-            role="radio"
-            :aria-checked="order === 'oldest'"
-            @click="switchOrder('oldest')"
-          >
-            最早在前
-          </button>
-        </div>
+        <button
+          v-if="activeThread.status === 'active'"
+          class="btn-primary"
+          :disabled="props.busy"
+          @click="entryOpen = true"
+        >
+          ＋ 记录动态
+        </button>
       </div>
       <ol v-if="!entries.length" class="empty">
         还没有动态。写下第一条，发生时间默认是现在。
@@ -714,6 +648,102 @@ onBeforeUnmount(() => clearTimeout(saveTimer));
       @confirm="confirmPick"
       @close="picking = null"
     />
+    <SideDrawer v-if="activeThread" :open="editOpen" title="编辑基础信息" @close="editOpen = false">
+      <label class="field"
+        >标题<input
+          data-autofocus
+          :value="title"
+          :disabled="props.busy"
+          maxlength="300"
+          @input="title = ($event.target as HTMLInputElement).value"
+      /></label>
+      <label class="field"
+        >说明（可选）<textarea
+          :value="description"
+          :disabled="props.busy"
+          rows="3"
+          maxlength="2000"
+          placeholder="一句话说明这件事"
+          @input="description = ($event.target as HTMLTextAreaElement).value"
+        />
+      </label>
+      <label class="field"
+        >当前概况<textarea
+          :value="summary"
+          :disabled="props.busy"
+          rows="4"
+          maxlength="4000"
+          placeholder="现在处于什么状态"
+          @input="summary = ($event.target as HTMLTextAreaElement).value"
+        /><span class="faint small">由你维护；动态只记录历史，不会自动改写它。</span></label
+      >
+      <p class="draft-status" :class="{ error: saveError }" aria-live="polite">
+        <span v-if="saveError">{{ saveError }}</span>
+        <span v-else-if="saveStatus">{{ saveStatus }}</span>
+      </p>
+      <template #footer>
+        <span>改动会自动保存</span>
+        <button
+          class="btn-quiet btn-danger"
+          :disabled="props.busy"
+          @click="removeThread(activeThread.id)"
+        >
+          移到回收站
+        </button>
+      </template>
+    </SideDrawer>
+
+    <SideDrawer
+      v-if="activeThread"
+      :open="entryOpen"
+      title="记录动态"
+      :hint="activeThread.title"
+      @close="entryOpen = false"
+    >
+      <label class="field"
+        >动态描述（必填）<input
+          data-autofocus
+          :value="composer.summary"
+          :disabled="submittingEntry"
+          maxlength="300"
+          placeholder="做了什么、想到什么、决定了什么"
+          @input="composer.summary = ($event.target as HTMLInputElement).value"
+      /></label>
+      <EntryFields
+        v-model:occurred-at="composer.occurredAt"
+        v-model:body="composer.body"
+        v-model:tags-text="composer.tagsText"
+        :disabled="submittingEntry"
+        :show-summary="false"
+      />
+      <div>
+        <div class="label">引用手记</div>
+        <div class="chip-row">
+          <span v-for="noteId in composerNoteIds" :key="noteId" class="chip on"
+            ><button class="chip-label" @click="emit('open-note', noteId)">
+              {{ noteById(noteId)?.title || '无标题手记' }}</button
+            ><button
+              class="chip-x"
+              aria-label="取消引用"
+              @click="composerNoteIds = composerNoteIds.filter((id) => id !== noteId)"
+            >
+              ×
+            </button></span
+          >
+          <button class="inline-add" @click="picking = 'composer'">＋ 引用手记</button>
+        </div>
+      </div>
+      <p v-if="composerError" class="composer-error" role="alert">{{ composerError }}</p>
+      <template #footer>
+        <span>发生时间默认是现在</span>
+        <div class="actions-inline">
+          <button class="btn-quiet" @click="entryOpen = false">取消</button>
+          <button class="btn-primary" :disabled="submittingEntry" @click="submitEntry">
+            {{ submittingEntry ? '正在记录…' : '记录动态' }}
+          </button>
+        </div>
+      </template>
+    </SideDrawer>
   </section>
 </template>
 
@@ -825,7 +855,21 @@ onBeforeUnmount(() => clearTimeout(saveTimer));
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   margin-bottom: 8px;
+}
+.timeline-head .head-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.timeline-head h2 {
+  white-space: nowrap;
+}
+.actions-inline {
+  display: flex;
+  gap: 8px;
 }
 .timeline-head h2 {
   font-size: 15px;

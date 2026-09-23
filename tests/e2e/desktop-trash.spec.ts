@@ -53,7 +53,7 @@ test('真实桌面：删除影响面、回收站与恢复顺序', async () => {
       .getByRole('dialog', { name: '新建归纳' })
       .getByRole('button', { name: '创建' })
       .click();
-    await page.locator('.page-head').getByRole('button', { name: '收录已有手记' }).click();
+    await page.locator('.detail-head').getByRole('button', { name: '收录已有手记' }).click();
     const topicPicker = page.getByRole('dialog', { name: '收录手记' });
     await topicPicker.getByRole('checkbox').first().check();
     await topicPicker.getByRole('button', { name: '收录', exact: true }).click();
@@ -72,13 +72,15 @@ test('真实桌面：删除影响面、回收站与恢复顺序', async () => {
       .getByRole('dialog', { name: '新建事务' })
       .getByRole('button', { name: '创建' })
       .click();
-    const composer = page.getByRole('textbox', { name: '动态描述', exact: true });
-    await composer.click();
-    await composer.fill('会被删除的动态');
-    await page.getByRole('button', { name: '记录动态', exact: true }).click();
-    await composer.click();
-    await composer.fill('保留到最后的动态');
-    await page.getByRole('button', { name: '记录动态', exact: true }).click();
+    const addEntry = async (summary: string) => {
+      await page.getByRole('button', { name: '＋ 记录动态' }).click();
+      const drawer = page.getByRole('dialog', { name: '记录动态' });
+      await drawer.getByRole('textbox', { name: '动态描述（必填）' }).fill(summary);
+      await drawer.getByRole('button', { name: '记录动态' }).click();
+      await expect(drawer).toHaveCount(0);
+    };
+    await addEntry('会被删除的动态');
+    await addEntry('保留到最后的动态');
     await expect(page.locator('.timeline .entry')).toHaveCount(2);
 
     // 删除手记：确认框先列出受影响的收录与引用位置。
@@ -140,7 +142,12 @@ test('真实桌面：删除影响面、回收站与恢复顺序', async () => {
     await dialog.getByRole('button', { name: '移到回收站' }).click();
     await expect(page.locator('.timeline .entry')).toHaveCount(1);
 
-    await page.locator('.page-head').getByRole('button', { name: '移到回收站' }).click();
+    // 删除事务的入口只在编辑基础信息抽屉里。
+    await page.getByRole('button', { name: '编辑基础信息' }).click();
+    await page
+      .getByRole('dialog', { name: '编辑基础信息' })
+      .getByRole('button', { name: '移到回收站' })
+      .click();
     await expect(dialog).toContainText('删除事务');
     await expect(dialog).toContainText('它的 1 条动态会一起隐藏');
     await expect(dialog).toContainText('此前单独删除的动态仍留在回收站');

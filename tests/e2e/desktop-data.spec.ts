@@ -70,10 +70,10 @@ test('真实桌面：备份、恢复、损坏备份拒绝与可读导出', async
       .getByRole('dialog', { name: '新建事务' })
       .getByRole('button', { name: '创建' })
       .click();
-    const composer = page.getByRole('textbox', { name: '动态描述', exact: true });
-    await composer.click();
-    await composer.fill('备份样例动态');
-    await page.getByRole('button', { name: '记录动态', exact: true }).click();
+    await page.getByRole('button', { name: '＋ 记录动态' }).click();
+    const entryDrawer = page.getByRole('dialog', { name: '记录动态' });
+    await entryDrawer.getByRole('textbox', { name: '动态描述（必填）' }).fill('备份样例动态');
+    await entryDrawer.getByRole('button', { name: '记录动态' }).click();
     await expect(page.locator('.timeline .entry')).toHaveCount(1);
 
     // 备份到固定位置。
