@@ -16,13 +16,37 @@ export function listMigrations(migrationsDirectory: string): string[] {
 }
 
 /**
- * 确认磁盘上的实际模式版本与迁移文件数量一致。
+ * 迁移文件数量必须与应用声明的模式版本一致。
+ * 缺文件时要在这里给出可定位的原因，而不是让后续的版本核对把「安装不完整」
+ * 说成「数据库来自更新版本」——两种情况的处置完全不同。
+ */
+export function assertMigrationCount(
+  migrationsDirectory: string,
+  expectedSchemaVersion: number,
+): void {
+  const count = listMigrations(migrationsDirectory).length;
+  if (count !== expectedSchemaVersion)
+    throw new AppError(
+      'STORAGE',
+      `迁移文件数量与应用版本不一致（需要 ${expectedSchemaVersion} 个，实际 ${count} 个），已停止打开数据库。请确认安装完整，或改用与数据匹配的版本。`,
+    );
+}
+
+/** 读取当前库的实际模式版本；备份清单据此声明包内数据库的版本。 */
+export function readSchemaVersion(database: DatabaseSync): number {
+  const version = database.prepare('PRAGMA user_version').get()?.user_version;
+  if (typeof version !== 'number' || version < 1)
+    throw new AppError('STORAGE', '数据库缺少可识别的模式版本，已停止操作。');
+  return version;
+}
+
+/**
+ * 确认磁盘上的实际模式版本与期望版本一致。
  * 迁移管理器在打开库时已执行同样检查；需要按版本分支建表的存储实现再核对一次，
  * 避免「先按新结构准备语句、后才发现版本不符」的半途失败。
  */
 export function requireMigrationVersion(database: DatabaseSync, expected: number): void {
-  const version = database.prepare('PRAGMA user_version').get()?.user_version;
-  if (version !== expected)
+  if (readSchemaVersion(database) !== expected)
     throw new AppError('STORAGE', '数据库模式版本与当前应用不一致，原数据未被修改。');
 }
 

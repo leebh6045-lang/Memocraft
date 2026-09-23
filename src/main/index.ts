@@ -2,6 +2,8 @@ import { app, dialog, Menu } from 'electron';
 import { isAbsolute, join } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { StoreClient } from './store-client';
+import { recoverInterruptedRestore } from '../storage/recovery';
+import { CHANNELS } from '../shared/contracts';
 import { createWindow, getApplicationIconPath } from './window';
 import { registerStoreIpc } from './ipc/register';
 import { registerImageScheme, serveImageProtocol } from './image-protocol';
@@ -32,6 +34,16 @@ async function start(): Promise<void> {
   const migrationsDirectory = app.isPackaged
     ? join(process.resourcesPath, 'migrations')
     : join(app.getAppPath(), 'migrations');
+  // 启动检测：上一次恢复若被中断，先把恢复前的数据放回去，绝不打开半套数据。
+  let startupNotice = '';
+  try {
+    if (recoverInterruptedRestore(dataDirectory) === 'rolled-back')
+      startupNotice = '检测到上次恢复没有完成，已回滚到恢复前的数据。';
+  } catch (error) {
+    throw error instanceof AppError
+      ? error
+      : new AppError('STORAGE', '检测未完成的恢复时失败，已停止打开数据。');
+  }
   const store = new StoreClient({ dataDirectory, migrationsDirectory });
   const initial = await store.request({ operation: 'load' });
   if (!initial.ok) throw new AppError(initial.error.code, initial.error.message);
@@ -49,7 +61,7 @@ async function start(): Promise<void> {
   const rendererUrl = devUrl
     ? new URL(devUrl).href
     : pathToFileURL(fileURLToPath(new URL('../renderer/index.html', import.meta.url))).href;
-  const unregister = registerStoreIpc(window, rendererUrl, store);
+  const unregister = registerStoreIpc(window, rendererUrl, store, { dataDirectory });
   coordinateWindowClose(window, rendererUrl, store);
   window.once('closed', unregister);
   app.on('second-instance', () => {
@@ -65,6 +77,8 @@ async function start(): Promise<void> {
     }
   });
   await window.loadURL(rendererUrl);
+  // 启动提示在界面就绪后送达：恢复回滚这类事实必须让用户看到，而不是只写日志。
+  if (startupNotice) window.webContents.send(CHANNELS.appNotice, startupNotice);
 }
 
 if (!app.requestSingleInstanceLock()) {

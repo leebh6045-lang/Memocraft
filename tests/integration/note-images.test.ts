@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { emptyDraft, type Note, type NoteDraft } from '../../src/domain/note';
 import { MAX_NOTE_IMAGE_COUNT } from '../../src/domain/note-image';
 import { NoteStore } from '../../src/storage/note-store';
+import { SCHEMA_VERSION } from '../../src/storage/schema';
 import { NoteImageStore } from '../../src/storage/note-image-store';
 import { backupLibrary, restoreDatabaseBackup } from '../../src/storage/backup';
 import { GIF_4X2, JPEG_6X7, NOT_AN_IMAGE, PNG_2X3, WEBP_5X4 } from '../fixtures/images';
@@ -18,7 +19,11 @@ let dataDirectory: string;
 const stores: NoteStore[] = [];
 
 function open(): { store: NoteStore; images: NoteImageStore } {
-  const store = new NoteStore({ dataDirectory, migrationsDirectory });
+  const store = new NoteStore({
+    dataDirectory,
+    migrationsDirectory,
+    expectedSchemaVersion: SCHEMA_VERSION,
+  });
   stores.push(store);
   // 附图与手记共用同一条连接，测试也按生产的装配方式构造。
   return { store, images: new NoteImageStore(store.connection(), dataDirectory) };
@@ -210,10 +215,10 @@ describe('图片随备份与恢复一起搬运', () => {
     const other = commit(store);
     images.add(other.id, [input(GIF_4X2)]);
     const backup = join(temporaryDirectory, 'library-backup');
-    await backupLibrary(store, images, migrationsDirectory, backup);
+    await backupLibrary(store, images, backup);
     const manifest = JSON.parse(readFileSync(join(backup, 'backup.json'), 'utf8'));
     expect(manifest.formatVersion).toBe(1);
-    expect(manifest.schemaVersion).toBe(2);
+    expect(manifest.schemaVersion).toBe(SCHEMA_VERSION);
     expect(manifest.attachments).toHaveLength(3);
     // 备份文件字节与源文件一致。
     for (const entry of manifest.attachments)
@@ -223,7 +228,11 @@ describe('图片随备份与恢复一起搬运', () => {
 
     const destination = join(temporaryDirectory, 'restored');
     await restoreDatabaseBackup(backup, destination, migrationsDirectory);
-    const restoredStore = new NoteStore({ dataDirectory: destination, migrationsDirectory });
+    const restoredStore = new NoteStore({
+      dataDirectory: destination,
+      migrationsDirectory,
+      expectedSchemaVersion: SCHEMA_VERSION,
+    });
     try {
       const restoredImages = new NoteImageStore(restoredStore.connection(), destination);
       expect(restoredStore.load()).toEqual(store.load());
@@ -240,7 +249,7 @@ describe('图片随备份与恢复一起搬运', () => {
     const note = commit(store);
     images.add(note.id, [input(PNG_2X3)]);
     const backup = join(temporaryDirectory, 'tampered-backup');
-    await backupLibrary(store, images, migrationsDirectory, backup);
+    await backupLibrary(store, images, backup);
     const manifest = JSON.parse(readFileSync(join(backup, 'backup.json'), 'utf8'));
     const target = join(backup, manifest.attachments[0].relativePath);
     writeFileSync(target, Buffer.from('tampered'));
@@ -262,7 +271,7 @@ describe('图片随备份与恢复一起搬运', () => {
     const note = commit(store);
     images.add(note.id, [input(PNG_2X3)]);
     const backup = join(temporaryDirectory, 'escape-backup');
-    await backupLibrary(store, images, migrationsDirectory, backup);
+    await backupLibrary(store, images, backup);
     const manifestPath = join(backup, 'backup.json');
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
     manifest.attachments[0].relativePath = '../../escaped.png';
@@ -290,7 +299,11 @@ describe('图片随备份与恢复一起搬运', () => {
     }
     const destination = join(temporaryDirectory, 'legacy-restore');
     await restoreDatabaseBackup(snapshot, destination, migrationsDirectory);
-    const restored = new NoteStore({ dataDirectory: destination, migrationsDirectory });
+    const restored = new NoteStore({
+      dataDirectory: destination,
+      migrationsDirectory,
+      expectedSchemaVersion: SCHEMA_VERSION,
+    });
     try {
       expect(restored.load().notes.map((item) => item.id)).toEqual([note.id]);
       expect(imageFiles(destination)).toEqual([]);
@@ -306,7 +319,7 @@ describe('图片随备份与恢复一起搬运', () => {
     if (!image) throw new Error('测试前置数据缺失');
     rmSync(join(dataDirectory, image.relativePath), { force: true });
     const backup = join(temporaryDirectory, 'missing-file-backup');
-    await expect(backupLibrary(store, images, migrationsDirectory, backup)).rejects.toThrow('缺失');
+    await expect(backupLibrary(store, images, backup)).rejects.toThrow('缺失');
     expect(existsSync(backup)).toBe(false);
     expect(
       readdirSync(temporaryDirectory).filter((name) => name.includes('missing-file-backup')),

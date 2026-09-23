@@ -58,7 +58,7 @@ test('真实桌面：草稿重启、四分类、保存、搜索、抽屉编辑�
     await expect(page.getByText('没有符合当前筛选条件的手记。')).toBeVisible();
     await page.getByRole('button', { name: /^全部/ }).click();
     await page.getByRole('button', { name: /^搜索/ }).click();
-    const search = page.getByRole('combobox', { name: '搜索手记' });
+    const search = page.getByRole('combobox', { name: '搜索内容' });
     await search.fill('sqlite');
     await expect(page.getByRole('dialog', { name: '全局搜索' }).getByRole('option')).toHaveCount(1);
     await search.dispatchEvent('keydown', { key: 'Enter', isComposing: true });
@@ -114,7 +114,7 @@ test('真实桌面：草稿重启、四分类、保存、搜索、抽屉编辑�
       '独立首页草稿',
     );
     await page.getByRole('button', { name: /^搜索/ }).click();
-    await page.getByRole('combobox', { name: '搜索手记' }).fill('100%_\\');
+    await page.getByRole('combobox', { name: '搜索内容' }).fill('100%_\\');
     await expect(page.getByRole('dialog', { name: '全局搜索' }).getByRole('option')).toHaveCount(1);
     expect(errors).toEqual([]);
     await quit(app);

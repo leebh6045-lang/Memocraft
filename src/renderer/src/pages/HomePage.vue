@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref, watch } from 'vue';
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import {
   categoryLabel,
   noteTitle,
@@ -8,6 +8,7 @@ import {
   type NoteDraft,
 } from '../../../domain/note';
 import AppIcon from '../components/AppIcon.vue';
+import { formatFullTime, formatTime } from '../format-time';
 import CategorySelector from '../components/CategorySelector.vue';
 
 const props = defineProps<{
@@ -27,9 +28,26 @@ const emit = defineEmits<{
   open: [id: string];
   navigate: [page: 'notes' | 'topics' | 'threads'];
   focus: [];
+  'create-topic': [];
+  'create-thread': [];
 }>();
 const body = ref<HTMLTextAreaElement | null>(null);
+const shaking = ref(false);
+let shakeTimer: ReturnType<typeof setTimeout> | undefined;
 const tagsText = ref(props.draft.tags.join(', '));
+watch(
+  () => props.error,
+  (message) => {
+    // 正文为空时服务端会拒绝提交：这里给出可见反馈并把焦点送回正文，避免只留一行红字。
+    if (!message || props.draft.body.trim()) return;
+    shaking.value = true;
+    body.value?.focus({ preventScroll: true });
+    clearTimeout(shakeTimer);
+    shakeTimer = setTimeout(() => {
+      shaking.value = false;
+    }, 320);
+  },
+);
 watch(
   () => props.draft.id,
   async () => {
@@ -39,6 +57,7 @@ watch(
   },
 );
 onMounted(() => body.value?.focus({ preventScroll: true }));
+onBeforeUnmount(() => clearTimeout(shakeTimer));
 function updateTags(event: Event) {
   if (!(event.target instanceof HTMLInputElement)) return;
   tagsText.value = event.target.value;
@@ -66,7 +85,7 @@ function updateTags(event: Event) {
         <AppIcon name="focus" />专注
       </button>
     </header>
-    <div class="editor">
+    <div class="editor" :class="{ 'is-shake': shaking }">
       <textarea
         ref="body"
         class="editor-body"
@@ -95,7 +114,7 @@ function updateTags(event: Event) {
             /></label>
             <div class="field wide">
               <span>归纳与事务关联</span
-              ><span class="faint">关联功能尚未开放，可以先保存手记。</span>
+              ><span class="faint">先保存手记，再到手记详情里收录到归纳或关联事务。</span>
             </div>
           </div>
         </div>
@@ -139,10 +158,10 @@ function updateTags(event: Event) {
     </div>
     <div class="home-secondary" :inert="focused">
       <div class="home-links">
-        <button class="btn-quiet" title="归纳功能尚未开放" disabled>
+        <button class="btn-quiet" @click="emit('create-topic')">
           <AppIcon name="plus" class="icon-s" />新建归纳
         </button>
-        <button class="btn-quiet" title="事务功能尚未开放" disabled>
+        <button class="btn-quiet" @click="emit('create-thread')">
           <AppIcon name="plus" class="icon-s" />新建事务
         </button>
       </div>
@@ -160,11 +179,8 @@ function updateTags(event: Event) {
         >
           <span class="cat" :class="`cat-${note.category}`">{{ categoryLabel(note.category) }}</span
           ><span class="row-title">{{ noteTitle(note) }}</span>
-          <time :datetime="note.createdAt">{{
-            new Date(note.createdAt).toLocaleDateString('zh-CN', {
-              month: '2-digit',
-              day: '2-digit',
-            })
+          <time :datetime="note.createdAt" :title="formatFullTime(note.createdAt)">{{
+            formatTime(note.createdAt)
           }}</time>
         </button>
       </TransitionGroup>

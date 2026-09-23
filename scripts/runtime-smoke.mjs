@@ -42,8 +42,11 @@ try {
   };
   await request({ operation: 'saveDraft', payload: draft });
   await request({ operation: 'commitDraft', payload: draft });
+  // 全对象搜索：普通符号按文本匹配，草稿不参与，因此只应命中刚提交的那条手记。
   const found = await request({ operation: 'search', payload: '100%_' });
-  assert.equal(found.notes.length, 1);
+  assert.equal(found.hits.length, 1);
+  assert.equal(found.hits[0].kind, 'note');
+  assert.equal(found.hasMore, false);
   await request({ operation: 'close' });
   const database = new DatabaseSync(join(directory, 'memocraft.sqlite'));
   try {

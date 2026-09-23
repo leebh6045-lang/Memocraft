@@ -8,6 +8,7 @@ import { emptyDraft, type NoteDraft } from '../../src/domain/note';
 import { NoteStore } from '../../src/storage/note-store';
 import { backupLibrary, restoreDatabaseBackup } from '../../src/storage/backup';
 import { NoteImageStore } from '../../src/storage/note-image-store';
+import { SCHEMA_VERSION } from '../../src/storage/schema';
 
 const migrationsDirectory = resolve('migrations');
 let temporaryDirectory: string;
@@ -24,8 +25,13 @@ function withImages(store: NoteStore): NoteImageStore {
 function open(
   directory = join(temporaryDirectory, 'data'),
   migrations = migrationsDirectory,
+  expectedSchemaVersion = SCHEMA_VERSION,
 ): NoteStore {
-  const store = new NoteStore({ dataDirectory: directory, migrationsDirectory: migrations });
+  const store = new NoteStore({
+    dataDirectory: directory,
+    migrationsDirectory: migrations,
+    expectedSchemaVersion,
+  });
   stores.push(store);
   return store;
 }
@@ -71,7 +77,6 @@ describe('真实 SQLite 记录闭环', () => {
     });
     first.saveDraft(content);
     expect(first.load().notes).toEqual([]);
-    expect(first.search('中文').notes).toEqual([]);
     close(first);
     const reopened = open();
     expect(reopened.load().draft).toEqual(content);
@@ -145,7 +150,6 @@ describe('真实 SQLite 记录闭环', () => {
     expect(store.updateNote(edit)).toEqual(updated);
     expect(() => store.updateNote({ ...edit, body: '旧窗口内容' })).toThrow('已有更新');
     expect(store.load().draft).toEqual(next);
-    expect(store.search('更新后').notes).toEqual([updated]);
   });
 
   it('空白正文拒绝保存，数据库分类/关系约束实际生效', () => {
@@ -167,25 +171,7 @@ describe('真实 SQLite 记录闭环', () => {
     });
   });
 
-  it('中文、英文大小写、标签、emoji与普通符号按子串搜索，软删除隐藏', () => {
-    const store = open();
-    const note = store.commitDraft(
-      draft({ body: '证书 TLS 100% foo_bar C:\\temp 🙂', title: '唯一标题', tags: ['标签命中'] }),
-    );
-    const unrelated = store.commitDraft(draft({ body: '100000 fooXbar C:/temp' }));
-    for (const query of ['证书', 'tls', '%', '_', '\\', '🙂', '唯一标题', '标签命中'])
-      expect(store.search(query).notes).toEqual([note]);
-    expect(store.search('   ')).toEqual({ notes: store.load().notes, hasMore: false });
-    mutateDatabase((database) =>
-      database
-        .prepare('UPDATE notes SET deleted_at = ? WHERE id = ?')
-        .run(new Date().toISOString(), note.id),
-    );
-    expect(store.search('证书').notes).toEqual([]);
-    expect(store.load().notes).toEqual([unrelated]);
-  });
-
-  it('标签原文区分大小写，编辑重试不被其他手记的标签拼写影响', () => {
+  it('标签原文区分大小写，编辑重试不会被其他手记的标签拼写影响', () => {
     const store = open();
     store.commitDraft(draft({ tags: ['SQLite'] }));
     const note = store.commitDraft(draft({ tags: ['sqlite'] }));
@@ -193,48 +179,6 @@ describe('真实 SQLite 记录闭环', () => {
     const updated = store.updateNote(edit);
     expect(updated.tags).toEqual(['sqlite']);
     expect(store.updateNote(edit)).toEqual(updated);
-    expect(store.search('SQLITE').notes).toHaveLength(2);
-  });
-
-  it('空关键词仅显示最近五条有效手记，排除草稿和回收站内容', () => {
-    const store = open();
-    const savedNotes = Array.from({ length: 8 }, (_, index) =>
-      store.commitDraft(draft({ body: `最近记录 ${index}` })),
-    );
-    mutateDatabase((database) => {
-      for (const [index, saved] of savedNotes.entries()) {
-        database
-          .prepare('UPDATE notes SET created_at = ? WHERE id = ?')
-          .run(`2026-09-20T10:0${index}:00.000Z`, saved.id);
-      }
-      const latest = savedNotes[7];
-      if (!latest) throw new Error('缺少最新测试手记');
-      database
-        .prepare('UPDATE notes SET deleted_at = ? WHERE id = ?')
-        .run(new Date().toISOString(), latest.id);
-    });
-    const homeDraft = draft({ body: '最新写下但尚未提交的草稿' });
-    store.saveDraft(homeDraft);
-    const expectedIds = savedNotes
-      .slice(2, 7)
-      .reverse()
-      .map((saved) => saved.id);
-    for (const query of ['', '  \t\n  ']) {
-      const result = store.search(query);
-      expect(result.notes.map((saved) => saved.id)).toEqual(expectedIds);
-      expect(result.notes).toHaveLength(5);
-      expect(result.notes.some((saved) => saved.id === homeDraft.id)).toBe(false);
-      expect(result.hasMore).toBe(false);
-    }
-  });
-
-  it('搜索结果最多 50 条，并明确还有更多', () => {
-    const store = open();
-    for (let index = 0; index < 51; index += 1)
-      store.commitDraft(draft({ body: `共同关键词 ${index}` }));
-    const result = store.search('共同关键词');
-    expect(result.notes).toHaveLength(50);
-    expect(result.hasMore).toBe(true);
   });
 });
 
@@ -250,7 +194,7 @@ describe('数据库迁移、备份和恢复保护', () => {
     store.commitDraft(draft({ tags: ['SQLite', '知识'], category: 'misc' }));
     store.saveDraft(draft({ category: 'done', extrasOpen: true }));
     const backup = join(temporaryDirectory, 'snapshot-backup');
-    await backupLibrary(store, withImages(store), migrationsDirectory, backup);
+    await backupLibrary(store, withImages(store), backup);
     const destination = join(temporaryDirectory, 'restored');
     await restoreDatabaseBackup(backup, destination, migrationsDirectory);
     expect(open(destination).load()).toEqual(store.load());
@@ -268,9 +212,7 @@ describe('数据库迁移、备份和恢复保护', () => {
       restored.close();
     }
     const existing = readFileSync(join(backup, 'backup.json'));
-    await expect(
-      backupLibrary(store, withImages(store), migrationsDirectory, backup),
-    ).rejects.toThrow('目标已存在');
+    await expect(backupLibrary(store, withImages(store), backup)).rejects.toThrow('目标已存在');
     expect(readFileSync(join(backup, 'backup.json'))).toEqual(existing);
     await expect(restoreDatabaseBackup(backup, destination, migrationsDirectory)).rejects.toThrow(
       '目录必须为空',
@@ -289,7 +231,7 @@ describe('数据库迁移、备份和恢复保护', () => {
     expect(readdirSync(brokenDestination)).toEqual([]);
     const store = open();
     const future = join(temporaryDirectory, 'future-backup');
-    await backupLibrary(store, withImages(store), migrationsDirectory, future);
+    await backupLibrary(store, withImages(store), future);
     const connection = new DatabaseSync(join(future, 'memocraft.sqlite'));
     connection.exec('PRAGMA user_version = 999');
     connection.close();
@@ -308,7 +250,7 @@ describe('数据库迁移、备份和恢复保护', () => {
       join(only001, '001_notes.sql'),
       readFileSync(join(migrationsDirectory, '001_notes.sql')),
     );
-    const store = open(join(temporaryDirectory, 'data'), only001);
+    const store = open(join(temporaryDirectory, 'data'), only001, 1);
     const note = store.commitDraft(draft());
     close(store);
     const faulty = join(temporaryDirectory, 'migrations');
@@ -327,6 +269,7 @@ describe('数据库迁移、备份和恢复保护', () => {
         new NoteStore({
           dataDirectory: join(temporaryDirectory, 'data'),
           migrationsDirectory: faulty,
+          expectedSchemaVersion: 3,
         }),
     ).toThrow();
     mutateDatabase((database) => {
@@ -343,35 +286,31 @@ describe('数据库迁移、备份和恢复保护', () => {
   });
 
   it('备份在副本上升级受支持的旧版本，保留源备份版本和记录', async () => {
-    const store = open();
-    store.commitDraft(draft({ tags: ['升级样例'] }));
-    const snapshot = store.load();
+    // 造一份只到 002 的旧库：迁移目录只放 001 与 002，期望版本一起声明为 2。
+    const legacyMigrations = join(temporaryDirectory, 'legacy-migrations');
+    mkdirSync(legacyMigrations);
+    for (const name of ['001_notes.sql', '002_note_images.sql']) {
+      writeFileSync(join(legacyMigrations, name), readFileSync(join(migrationsDirectory, name)));
+    }
+    const legacyDirectory = join(temporaryDirectory, 'legacy-data');
+    const legacy = open(legacyDirectory, legacyMigrations, 2);
+    legacy.commitDraft(draft({ tags: ['升级样例'] }));
+    const snapshot = legacy.load();
+    const legacyImages = new NoteImageStore(legacy.connection(), legacyDirectory, 2);
+    imageStores.push(legacyImages);
     const backup = join(temporaryDirectory, 'old-backup');
-    await backupLibrary(store, withImages(store), migrationsDirectory, backup);
-    const nextMigrations = join(temporaryDirectory, 'next-migrations');
-    mkdirSync(nextMigrations);
-    writeFileSync(
-      join(nextMigrations, '001_notes.sql'),
-      readFileSync(join(migrationsDirectory, '001_notes.sql')),
-    );
-    writeFileSync(
-      join(nextMigrations, '002_note_images.sql'),
-      readFileSync(join(migrationsDirectory, '002_note_images.sql')),
-    );
-    writeFileSync(
-      join(nextMigrations, '003_index.sql'),
-      'CREATE INDEX notes_updated_at ON notes(updated_at);',
-    );
+    await backupLibrary(legacy, legacyImages, backup);
+    // 用应用自带的完整迁移目录恢复旧备份：副本应被升级到当前模式版本。
     const destination = join(temporaryDirectory, 'upgraded');
-    await restoreDatabaseBackup(backup, destination, nextMigrations);
-    expect(open(destination, nextMigrations).load()).toEqual(snapshot);
+    await restoreDatabaseBackup(backup, destination, migrationsDirectory);
+    expect(open(destination).load()).toEqual(snapshot);
     const source = new DatabaseSync(join(backup, 'memocraft.sqlite'), { readOnly: true });
     try {
       expect(source.prepare('PRAGMA user_version').get()?.user_version).toBe(2);
       // 恢复在副本上推进到当前迁移数，源备份保持原版本。
       const upgraded = new DatabaseSync(join(destination, 'memocraft.sqlite'), { readOnly: true });
       try {
-        expect(upgraded.prepare('PRAGMA user_version').get()?.user_version).toBe(3);
+        expect(upgraded.prepare('PRAGMA user_version').get()?.user_version).toBe(SCHEMA_VERSION);
       } finally {
         upgraded.close();
       }

@@ -727,6 +727,262 @@ textarea::placeholder {
   pointer-events: none;
 }
 
+/* 空正文提交被拒绝：短促抖动，把注意力带回正文，而不是只留一行错误文字。 */
+.editor.is-shake {
+  animation: editor-shake 300ms ease-out;
+}
+@keyframes editor-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  15% {
+    transform: translateX(-5px);
+  }
+  35% {
+    transform: translateX(5px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+
+/* 按钮式分段控件（设置页等）：选中项用浮起底块表达，宽度不等时不依赖固定步长。 */
+.seg button {
+  position: relative;
+  z-index: 1;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  transition:
+    background-color var(--dur-1) ease,
+    color var(--dur-1) ease,
+    box-shadow var(--dur-2) ease;
+}
+.seg button:hover {
+  color: var(--text);
+}
+.seg button[aria-checked='true'] {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 500;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    0 0 0 1px var(--border);
+}
+
+/* 集合卡片（知识归纳等）：序号 + 标题 + 说明 + 数量与时间。 */
+.card.collection {
+  gap: 10px;
+  min-height: 130px;
+}
+.card.collection .index {
+  font-family: var(--font-head);
+  font-size: 12px;
+  color: var(--faint);
+  letter-spacing: 0.06em;
+}
+.card.collection h3 {
+  font-size: 16px;
+}
+.card.collection p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.card .meta-line {
+  display: flex;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 6px;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+/* 面包屑：详情页返回列表，保持与列表标题同源的视觉层级。 */
+.crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 4px 8px 4px 4px;
+  border-radius: var(--radius-s);
+  color: var(--muted);
+  font-size: 13px;
+}
+.crumb:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* 关系标签：收纳关系用可点击 chip 表达，末尾是新增入口。 */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+}
+.chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.chip.on {
+  border-color: transparent;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.chip-x {
+  opacity: 0.6;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+}
+.chip:hover .chip-x {
+  opacity: 1;
+}
+.inline-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 999px;
+  color: var(--faint);
+  font-size: 12px;
+}
+.inline-add:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* 从引用跳转过来时短暂高亮那条动态，帮助定位。 */
+.entry.is-hl {
+  animation: entry-flash 1.8s ease-out;
+  border-radius: 8px;
+}
+@keyframes entry-flash {
+  0% {
+    background: var(--accent-soft);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+/* 说明条与行式列表：回收站等辅助页面使用，与卡片网格区分开。 */
+.notebar {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 18px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.rows {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.rows .row {
+  width: 100%;
+  margin: 0;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  align-items: center;
+}
+.rows .row:last-child {
+  border-bottom: 0;
+}
+.row-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.row-ctx {
+  font-size: 12px;
+  color: var(--faint);
+}
+.type-pill {
+  flex: none;
+  width: 44px;
+  font-size: 11px;
+  color: var(--faint);
+}
+
+/* 搜索结果里的命中高亮；只由已转义的文本生成。 */
+mark {
+  padding: 0 1px;
+  border-radius: 2px;
+  background: var(--accent-soft);
+  color: inherit;
+}
+
+/* 结果行的上下文列：分类、状态或所属事务。 */
+.palette-item .pi-ctx {
+  flex: none;
+  max-width: 38%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+/* 引用标签：动态里指向被引用手记的入口。 */
+.ref-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  transition:
+    border-color var(--dur-1) ease,
+    color var(--dur-1) ease,
+    background-color var(--dur-1) ease;
+}
+.ref-chip:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* 小号分段控件：时间线排序等次级切换使用。 */
+.seg-sm button {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
 /* 分类标记 */
 .cat {
   display: inline-flex;
@@ -1435,7 +1691,8 @@ textarea::placeholder {
   transform: translateX(-50%) translateY(-8px) scale(0.98);
 }
 
-/* 桌面最小窗口为 1000 × 700；下列降级也兼容独立浏览器预览。 */
+/* 断点按基准：1000–1050px 收边距，≤900px 转单列并收窄侧栏，≤720px 侧栏改顶部横向条。
+   桌面最小窗口为 1000 × 700；更窄的降级同时兼容独立浏览器预览。 */
 @media (max-width: 1050px) {
   .view {
     padding-right: 32px;
@@ -1446,7 +1703,7 @@ textarea::placeholder {
     padding-left: 3px;
   }
 }
-@media (max-width: 800px) {
+@media (max-width: 900px) {
   :root {
     --nav-w: 190px;
   }
@@ -1463,6 +1720,42 @@ textarea::placeholder {
     align-items: flex-start;
   }
 }
+@media (max-width: 720px) {
+  .app {
+    grid-template-columns: 1fr;
+  }
+  .nav {
+    position: static;
+    height: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-list {
+    flex-direction: row;
+    margin-top: 0;
+  }
+  .nav-ind {
+    display: none;
+  }
+  .nav-tools {
+    margin-top: 0;
+    margin-left: auto;
+    flex-direction: row;
+  }
+  .beta {
+    left: auto;
+    right: 14px;
+  }
+  .corner {
+    left: auto;
+    right: 14px;
+  }
+}
 html.theme-switching,
 html.theme-switching * {
   transition:
@@ -1474,6 +1767,204 @@ html.theme-switching * {
     stroke var(--dur-3) ease,
     outline-color var(--dur-3) ease,
     text-decoration-color var(--dur-3) ease;
+}
+
+/* 左下角：发行标识与辅助入口（设置、阶段 4 起的回收站）并列，不占用侧栏工具区。 */
+.corner {
+  position: fixed;
+  left: 16px;
+  bottom: 10px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.corner .beta {
+  position: static;
+}
+.corner-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  color: var(--faint);
+  transition:
+    background-color var(--dur-1) ease,
+    color var(--dur-1) ease;
+}
+.corner-btn:hover,
+.corner-btn.active {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* 提示条：报告已完成的操作，可携带一个操作按钮；位于底部居中，不抢焦点。 */
+.toasts {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px 10px 16px;
+  border-radius: var(--radius);
+  background: var(--text);
+  color: var(--bg);
+  font-size: 13px;
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+}
+.toast button {
+  padding: 4px 8px;
+  border-radius: var(--radius-s);
+  color: inherit;
+  font-weight: 500;
+  opacity: 0.85;
+}
+.toast button:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.16);
+}
+.toast-enter-active,
+.toast-leave-active {
+  transition:
+    opacity var(--dur-2) ease,
+    transform var(--dur-3) var(--ease-out);
+}
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(14px) scale(0.97);
+}
+
+/* 对话框：与抽屉、搜索同级的模态层，背景点击不关闭，避免误丢已输入内容。 */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: var(--backdrop);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.dialog-panel {
+  position: fixed;
+  z-index: 71;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(520px, 92vw);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.dialog-panel:focus {
+  outline: 0;
+}
+.dialog-body {
+  display: grid;
+  gap: 14px;
+  padding: 22px 24px 8px;
+  overflow: auto;
+}
+.dialog-body h2 {
+  font-size: 18px;
+}
+.dialog-body .hint {
+  margin-top: -8px;
+  font-size: 12px;
+  color: var(--faint);
+}
+.dialog-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 24px 18px;
+}
+.dialog-foot .left {
+  margin-right: auto;
+  font-size: 12px;
+  color: var(--faint);
+}
+.dialog-transition-enter-active .dialog-panel,
+.dialog-transition-leave-active .dialog-panel {
+  transition:
+    opacity var(--dur-2) ease,
+    transform var(--dur-3) var(--ease-out);
+}
+.dialog-transition-enter-active .dialog-backdrop,
+.dialog-transition-leave-active .dialog-backdrop {
+  transition: opacity var(--dur-2) ease;
+}
+.dialog-transition-enter-from .dialog-panel,
+.dialog-transition-leave-to .dialog-panel {
+  opacity: 0;
+  transform: translate(-50%, -50%) translateY(10px) scale(0.98);
+}
+.dialog-transition-enter-from .dialog-backdrop,
+.dialog-transition-leave-to .dialog-backdrop {
+  opacity: 0;
+}
+
+/* 多选列表：收录与关联手记的选择器共用，行内含标题与用于区分同名项的说明。 */
+.pick-list {
+  display: grid;
+  gap: 4px;
+  max-height: 44vh;
+  overflow: auto;
+  margin: 0 -8px;
+  padding: 0 8px;
+}
+.pick {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.pick:hover {
+  background: var(--surface-2);
+}
+.pick input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.pick .pick-main {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.pick time {
+  flex: none;
+  font-size: 12px;
+  color: var(--faint);
+}
+.pick-count {
+  font-size: 12px;
+  color: var(--muted);
 }
 
 @media (prefers-reduced-motion: reduce) {

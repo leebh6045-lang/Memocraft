@@ -2,6 +2,14 @@ import { Worker } from 'node:worker_threads';
 import type { StoreRequest, StoreValue, WorkerReply } from '../shared/contracts';
 import { AppError, failure, type Result } from '../shared/errors';
 
+/** 长任务按操作区分超时：含附件的备份、导出与恢复暂存可能远超普通请求。 */
+const OPERATION_TIMEOUTS: Partial<Record<StoreRequest['operation'], number>> = {
+  backupLibrary: 10 * 60_000,
+  exportLibrary: 10 * 60_000,
+  stageRestore: 10 * 60_000,
+};
+const DEFAULT_TIMEOUT = 30_000;
+
 interface PendingRequest {
   resolve: (result: Result<StoreValue>) => void;
   timer: ReturnType<typeof setTimeout>;
@@ -30,7 +38,7 @@ export class StoreClient {
     return new Promise((resolve) => {
       const timer = setTimeout(
         () => this.fail(worker, '数据操作超时，结果尚未确认。内容仍在编辑区，请重试。'),
-        30_000,
+        OPERATION_TIMEOUTS[request.operation] ?? DEFAULT_TIMEOUT,
       );
       this.pending.set(id, { resolve, timer });
       try {
@@ -39,6 +47,23 @@ export class StoreClient {
         this.fail(worker, '数据服务暂时不可用，内容仍在编辑区，请重试。');
       }
     });
+  }
+
+  /**
+   * 丢弃当前存储线程，使下一次请求重新开库。
+   * 恢复活动库时必须先让持有连接的线程退出，替换完成后再由这里重开。
+   */
+  async reset(): Promise<void> {
+    const worker = this.worker;
+    this.worker = null;
+    this.closed = false;
+    this.closing = false;
+    this.failPending('数据服务正在重启，请稍后重试。');
+    if (!worker) return;
+    this.termination = worker.terminate().finally(() => {
+      this.termination = null;
+    });
+    await this.termination;
   }
 
   async close(): Promise<Result<StoreValue>> {

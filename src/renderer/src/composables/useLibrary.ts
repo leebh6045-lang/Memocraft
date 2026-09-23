@@ -74,6 +74,16 @@ export function useLibrary(api: MemocraftApi) {
 
   async function initialize() {
     if (loading.value || loaded.value) return;
+    await loadSnapshot();
+  }
+
+  /** 重新读取库快照；删除手记等改变集合的操作必须用它，不能用只生效一次的 initialize。 */
+  async function reload() {
+    if (loading.value) return;
+    await loadSnapshot();
+  }
+
+  async function loadSnapshot() {
     loading.value = true;
     loadError.value = '';
     try {
@@ -302,6 +312,7 @@ export function useLibrary(api: MemocraftApi) {
   });
   return {
     notes,
+    reload,
     draft,
     editing,
     loaded,

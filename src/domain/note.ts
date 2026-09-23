@@ -41,11 +41,6 @@ export interface LibrarySnapshot {
   notes: Note[];
 }
 
-export interface NoteSearchResult {
-  notes: Note[];
-  hasMore: boolean;
-}
-
 // 无标题时只生成展示摘要，不把摘要写回标题或正文。
 export function noteTitle(note: NoteContent): string {
   return (

@@ -8,15 +8,19 @@ import {
   readFileSync,
   renameSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import { dirname, join, resolve, sep } from 'node:path';
 import { backup as sqliteBackup, DatabaseSync } from 'node:sqlite';
 import { AppError } from '../shared/errors';
-import { checkIntegrity, DATABASE_FILENAME, listMigrations } from './database';
+import { checkIntegrity, DATABASE_FILENAME, readSchemaVersion } from './database';
 import { NoteStore } from './note-store';
 import { ATTACHMENTS_DIRECTORY, NoteImageStore } from './note-image-store';
+import { SCHEMA_VERSION } from './schema';
+import { ENTRY_VISIBLE } from './visibility';
+import type { BackupSummary, LibraryCounts, StagedRestore } from '../domain/library-data';
 
 /** 备份清单：格式版本随包结构变化，模式版本用于核对数据库与迁移的兼容性。 */
 const MANIFEST_FILENAME = 'backup.json';
@@ -47,13 +51,13 @@ function safeJoin(root: string, relativePath: string): string {
  * 生成包含数据库快照与附件目录的一致备份目录。
  * 顺序：数据库快照 → 附件复制 → 清单 → 逐项校验 → 原子改名发布。
  * 任一步失败都删除临时目录，不覆盖已有备份，也不留下半套结果。
+ * 清单里的模式版本取自库自身的实际版本，不按迁移目录的文件数推算。
  */
 export async function backupLibrary(
   store: NoteStore,
   images: NoteImageStore,
-  migrationsDirectory: string,
   destination: string,
-): Promise<void> {
+): Promise<BackupSummary> {
   if (existsSync(destination))
     throw new AppError('CONFLICT', '备份目标已存在，请选择新位置，避免覆盖已有备份。');
   const temporary = `${destination}.${randomUUID()}.tmp`;
@@ -71,7 +75,7 @@ export async function backupLibrary(
     const files = images.allFiles();
     const manifest: BackupManifest = {
       formatVersion: BACKUP_FORMAT_VERSION,
-      schemaVersion: listMigrations(migrationsDirectory).length,
+      schemaVersion: readSchemaVersion(store.connection()),
       createdAt: new Date().toISOString(),
       database: DATABASE_FILENAME,
       attachments: files.map((file) => ({
@@ -90,6 +94,14 @@ export async function backupLibrary(
     verifyManifest(temporary, manifest);
     // 目录改名在同一文件系统内是原子的：失败时目标仍不存在。
     renameSync(temporary, destination);
+    return {
+      destination,
+      createdAt: manifest.createdAt,
+      attachments: files.length,
+      bytes:
+        statSync(join(destination, DATABASE_FILENAME)).size +
+        files.reduce((total, file) => total + file.bytes.byteLength, 0),
+    };
   } catch (error) {
     rmSync(temporary, { recursive: true, force: true });
     throw error;
@@ -132,25 +144,52 @@ function verifyManifest(directory: string, manifest: BackupManifest): void {
   }
 }
 
+/** 恢复暂存目录名与恢复保护共用一处定义，避免两处常量漂移。 */
+export { STAGING_DIRECTORY } from './recovery';
+
+/** 数据形状定义在 domain，这里只做转发，保证存储与界面用同一份类型。 */
+export type { BackupSummary, LibraryCounts, StagedRestore } from '../domain/library-data';
+
+/** 用一条只读连接统计内容数量；同样遵守可见性规则（软删除的不计入）。 */
+export function libraryCounts(database: DatabaseSync): LibraryCounts {
+  const count = (sql: string): number => {
+    const row = database.prepare(sql).get() as { total?: unknown } | undefined;
+    return typeof row?.total === 'number' ? row.total : 0;
+  };
+  return {
+    notes: count('SELECT count(*) AS total FROM notes WHERE deleted_at IS NULL'),
+    topics: count('SELECT count(*) AS total FROM topics WHERE deleted_at IS NULL'),
+    threads: count('SELECT count(*) AS total FROM threads WHERE deleted_at IS NULL'),
+    entries: count(
+      `SELECT count(*) AS total FROM thread_entries
+       JOIN threads ON threads.id = thread_entries.thread_id
+       WHERE ${ENTRY_VISIBLE}`,
+    ),
+  };
+}
+
 /**
- * 恢复数据库与附件到干净目录。
+ * 校验备份并展开到指定暂存目录（目录会被清空重建）。
+ * 只读取备份、只写暂存目录，**不触碰活动数据**；任何失败都不留下半套结果。
  * 支持两种来源：本轮及以后生成的备份目录包，以及早期只含数据库文件的快照。
- * 始终在临时目录内完成迁移与内容校验，失败不会改写目标目录。
  */
-export async function restoreDatabaseBackup(
-  sourcePath: string,
-  targetDirectory: string,
-  migrationsDirectory: string,
-): Promise<void> {
+/** 校验备份来源：目录包读清单并逐项核对校验值，裸快照只确认文件存在。 */
+export function validateBackup(sourcePath: string): { manifest: BackupManifest | null } {
   if (!existsSync(sourcePath)) throw new AppError('NOT_FOUND', '备份不存在。');
   const isDirectory = existsSync(join(sourcePath, MANIFEST_FILENAME));
   const manifest = isDirectory ? readManifest(sourcePath) : null;
   if (manifest) verifyManifest(sourcePath, manifest);
-  // 校验全部通过后才创建目标目录：被拒绝的恢复不在磁盘上留下任何痕迹。
-  mkdirSync(targetDirectory, { recursive: true });
-  if (readdirSync(targetDirectory).length !== 0)
-    throw new AppError('CONFLICT', '恢复目录必须为空，已有数据不会被覆盖。');
-  const stagingDirectory = mkdtempSync(join(targetDirectory, '.restore-'));
+  return { manifest };
+}
+
+export async function stageRestoreInto(
+  sourcePath: string,
+  stagingDirectory: string,
+  migrationsDirectory: string,
+): Promise<StagedRestore> {
+  const { manifest } = validateBackup(sourcePath);
+  rmSync(stagingDirectory, { recursive: true, force: true });
+  mkdirSync(stagingDirectory, { recursive: true });
   try {
     const sourceDatabase = manifest ? join(sourcePath, manifest.database) : sourcePath;
     if (!existsSync(sourceDatabase)) throw new AppError('STORAGE', '备份中缺少数据库文件。');
@@ -168,16 +207,55 @@ export async function restoreDatabaseBackup(
     }
     // 附件先落到暂存目录，再与数据库一起发布，避免出现只有一半的恢复结果。
     const sourceAttachments = join(sourcePath, ATTACHMENTS_DIRECTORY);
+    let attachments = 0;
     if (manifest && existsSync(sourceAttachments)) {
       cpSync(sourceAttachments, join(stagingDirectory, ATTACHMENTS_DIRECTORY), { recursive: true });
+      attachments = manifest.attachments.length;
     }
-    // 在副本中验证版本、迁移和内容，失败不会改写原备份。
-    const staged = new NoteStore({ dataDirectory: stagingDirectory, migrationsDirectory });
+    // 在副本中验证版本、迁移与内容；失败不会改写原备份，也不影响活动库。
+    const staged = new NoteStore({
+      dataDirectory: stagingDirectory,
+      migrationsDirectory,
+      expectedSchemaVersion: SCHEMA_VERSION,
+    });
     try {
       staged.load();
     } finally {
       staged.close();
     }
+    // 迁移可能更新了副本，重新取一次字节数用于汇报；统计用只读连接，不影响暂存内容。
+    const databaseBytes = statSync(join(stagingDirectory, DATABASE_FILENAME)).size;
+    const verification = new DatabaseSync(join(stagingDirectory, DATABASE_FILENAME), {
+      readOnly: true,
+    });
+    try {
+      return { attachments, databaseBytes, counts: libraryCounts(verification) };
+    } finally {
+      verification.close();
+    }
+  } catch (error) {
+    rmSync(stagingDirectory, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+/**
+ * 恢复到干净目录：目标必须为空，用于"恢复到别处查看"与自动化验证。
+ * 校验与展开都在目标目录内的临时子目录完成，失败不会留下半套数据。
+ */
+export async function restoreDatabaseBackup(
+  sourcePath: string,
+  targetDirectory: string,
+  migrationsDirectory: string,
+): Promise<void> {
+  // 校验全部通过后才创建目标目录：被拒绝的恢复不在磁盘上留下任何痕迹。
+  validateBackup(sourcePath);
+  mkdirSync(targetDirectory, { recursive: true });
+  if (readdirSync(targetDirectory).length !== 0)
+    throw new AppError('CONFLICT', '恢复目录必须为空，已有数据不会被覆盖。');
+  const stagingDirectory = mkdtempSync(join(targetDirectory, '.restore-'));
+  try {
+    await stageRestoreInto(sourcePath, stagingDirectory, migrationsDirectory);
     // 数据库最后落位：硬链接不会覆盖并发创建的目标。
     const stagedAttachments = join(stagingDirectory, ATTACHMENTS_DIRECTORY);
     if (existsSync(stagedAttachments))

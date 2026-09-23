@@ -6,10 +6,15 @@ import {
   type Note,
   type NoteDraft,
   type NoteEdit,
-  type NoteSearchResult,
 } from '../../src/domain/note';
 import type { MemocraftApi } from '../../src/shared/contracts';
 import type { NoteImageList } from '../../src/domain/note-image';
+import type { SearchResult } from '../../src/domain/search';
+import type { TopicSummary } from '../../src/domain/topic';
+import type { EntrySummary, NoteReference, ThreadSummary } from '../../src/domain/thread';
+import type { RemovalImpact, TrashItem } from '../../src/domain/trash';
+import type { BackupSummary, StagedRestore } from '../../src/storage/backup';
+import type { ExportSummary } from '../../src/storage/export-store';
 import type { Result } from '../../src/shared/errors';
 import { useLibrary } from '../../src/renderer/src/composables/useLibrary';
 
@@ -25,6 +30,19 @@ function enqueue<Request, Response>(
   return new Promise((resolve) => {
     queue.push({ request, resolve });
   });
+}
+
+/** 归纳与事务的写入在本文件不参与用例：统一返回明确失败，避免测试替身伪造成功。 */
+function unavailableTopic(): Result<TopicSummary> {
+  return { ok: false, error: { code: 'UNAVAILABLE', message: '测试替身未接入归纳写入。' } };
+}
+
+function unavailableThread(): Result<ThreadSummary> {
+  return { ok: false, error: { code: 'UNAVAILABLE', message: '测试替身未接入事务写入。' } };
+}
+
+function unavailableEntry(): Result<EntrySummary> {
+  return { ok: false, error: { code: 'UNAVAILABLE', message: '测试替身未接入动态写入。' } };
 }
 
 /** 每个写请求由测试显式应答，确保能观察真实请求之间继续输入的行为。 */
@@ -48,8 +66,8 @@ class ControlledApi implements MemocraftApi {
   updateNote(request: NoteEdit): Promise<Result<Note>> {
     return enqueue(this.noteWrites, request);
   }
-  async search(): Promise<Result<NoteSearchResult>> {
-    return { ok: true, value: { notes: [], hasMore: false } };
+  async search(): Promise<Result<SearchResult>> {
+    return { ok: true, value: { hits: [], hasMore: false } };
   }
   // 图集不在本文件覆盖范围内：这里只提供满足契约的空实现。
   async loadImages(): Promise<Result<NoteImageList>> {
@@ -66,6 +84,84 @@ class ControlledApi implements MemocraftApi {
   }
   async deleteImage(): Promise<Result<NoteImageList>> {
     return { ok: true, value: { images: [], totalBytes: 0 } };
+  }
+  // 归纳同样不在本文件覆盖范围内：只为满足契约，读取返回空、写入返回失败，不伪造成功。
+  async loadTopics(): Promise<Result<TopicSummary[]>> {
+    return { ok: true, value: [] };
+  }
+  async createTopic(): Promise<Result<TopicSummary>> {
+    return unavailableTopic();
+  }
+  async updateTopic(): Promise<Result<TopicSummary>> {
+    return unavailableTopic();
+  }
+  async loadTrash(): Promise<Result<TrashItem[]>> {
+    return { ok: true, value: [] };
+  }
+  async loadRemovalImpact(): Promise<Result<RemovalImpact>> {
+    return {
+      ok: false,
+      error: { code: 'UNAVAILABLE', message: '测试替身未接入回收站。' },
+    };
+  }
+  async removeItem(): Promise<Result<null>> {
+    return { ok: false, error: { code: 'UNAVAILABLE', message: '测试替身未接入回收站。' } };
+  }
+  async restoreItem(): Promise<Result<null>> {
+    return { ok: false, error: { code: 'UNAVAILABLE', message: '测试替身未接入回收站。' } };
+  }
+  // 备份、恢复与导出需要在真实文件系统上进行，由集成与桌面流程覆盖。
+  async backupLibrary(): Promise<Result<BackupSummary>> {
+    return { ok: false, error: { code: 'UNAVAILABLE', message: '测试替身未接入数据管理。' } };
+  }
+  async restoreLibrary(): Promise<Result<StagedRestore>> {
+    return { ok: false, error: { code: 'UNAVAILABLE', message: '测试替身未接入数据管理。' } };
+  }
+  async applyRestore(): Promise<Result<null>> {
+    return { ok: false, error: { code: 'UNAVAILABLE', message: '测试替身未接入数据管理。' } };
+  }
+  async exportLibrary(): Promise<Result<ExportSummary>> {
+    return { ok: false, error: { code: 'UNAVAILABLE', message: '测试替身未接入数据管理。' } };
+  }
+  onNotice(): () => void {
+    return () => undefined;
+  }
+  async addNotesToTopic(): Promise<Result<TopicSummary>> {
+    return unavailableTopic();
+  }
+  async removeNoteFromTopic(): Promise<Result<TopicSummary>> {
+    return unavailableTopic();
+  }
+  // 长期事务与动态同样不在本文件覆盖范围内。
+  async loadThreads(): Promise<Result<ThreadSummary[]>> {
+    return { ok: true, value: [] };
+  }
+  async createThread(): Promise<Result<ThreadSummary>> {
+    return unavailableThread();
+  }
+  async updateThread(): Promise<Result<ThreadSummary>> {
+    return unavailableThread();
+  }
+  async archiveThread(): Promise<Result<ThreadSummary>> {
+    return unavailableThread();
+  }
+  async addNotesToThread(): Promise<Result<ThreadSummary>> {
+    return unavailableThread();
+  }
+  async removeNoteFromThread(): Promise<Result<ThreadSummary>> {
+    return unavailableThread();
+  }
+  async loadEntries(): Promise<Result<EntrySummary[]>> {
+    return { ok: true, value: [] };
+  }
+  async createEntry(): Promise<Result<EntrySummary>> {
+    return unavailableEntry();
+  }
+  async updateEntry(): Promise<Result<EntrySummary>> {
+    return unavailableEntry();
+  }
+  async loadNoteReferences(): Promise<Result<NoteReference[]>> {
+    return { ok: true, value: [] };
   }
   onCloseRequested(): () => void {
     return () => undefined;

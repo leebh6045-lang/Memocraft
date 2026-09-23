@@ -6,6 +6,13 @@ import { MAX_IMAGE_BYTES, type ImageInput } from '../../domain/note-image';
 import { AppError, failure, type Result } from '../../shared/errors';
 import type { StoreClient } from '../store-client';
 import { isTrustedSender } from '../window';
+import {
+  applyRestore,
+  backupWithDialog,
+  exportWithDialog,
+  stageRestoreWithDialog,
+  type LibraryDataDeps,
+} from '../library-data';
 
 /** 一次最多读取的图片数量；与 services 校验上限保持一致。 */
 const MAX_SELECTED_FILES = 20;
@@ -60,13 +67,43 @@ export function registerStoreIpc(
   window: BrowserWindow,
   rendererUrl: string,
   store: StoreClient,
+  libraryData: { dataDirectory: string },
 ): () => void {
-  const operations = ['load', 'saveDraft', 'commitDraft', 'updateNote', 'search'] as const;
+  // 无载荷与有载荷的操作走同一个分发入口；载荷由 services 校验，这里不解析内容。
+  const operations = [
+    'load',
+    'loadTopics',
+    'loadTrash',
+    'saveDraft',
+    'commitDraft',
+    'updateNote',
+    'search',
+    'createTopic',
+    'updateTopic',
+    'loadRemovalImpact',
+    'removeItem',
+    'restoreItem',
+    'addNotesToTopic',
+    'removeNoteFromTopic',
+    'loadThreads',
+    'createThread',
+    'updateThread',
+    'archiveThread',
+    'addNotesToThread',
+    'removeNoteFromThread',
+    'loadEntries',
+    'createEntry',
+    'updateEntry',
+    'loadNoteReferences',
+  ] as const;
   for (const operation of operations) {
     ipcMain.handle(CHANNELS[operation], async (event, payload: unknown) => {
       if (!isTrustedSender(event, window, rendererUrl))
         return failure(new AppError('UNAVAILABLE', '请求来源无效。'));
-      const request: StoreRequest = operation === 'load' ? { operation } : { operation, payload };
+      const request: StoreRequest =
+        operation === 'load' || operation === 'loadTopics' || operation === 'loadTrash'
+          ? { operation }
+          : { operation, payload };
       try {
         return await store.request(request);
       } catch (error) {
@@ -124,8 +161,74 @@ export function registerStoreIpc(
       return failure(error);
     }
   });
+  /** 保存对话框返回单个 filePath，这里统一成与打开对话框一致的形状。 */
+  const saveDialog = async (options: Electron.SaveDialogOptions) => {
+    const result = await dialog.showSaveDialog(window, options);
+    return { canceled: result.canceled, filePaths: result.filePath ? [result.filePath] : [] };
+  };
+  const deps: LibraryDataDeps = {
+    dataDirectory: libraryData.dataDirectory,
+    request: (request) => store.request(request),
+    closeStore: () => store.close(),
+    resetStore: () => store.reset(),
+  };
+  /** 三个数据通道都先弹主进程对话框，渲染端不传路径也不接触文件系统。 */
+  const guarded = (channel: string, run: () => Promise<Result<StoreValue | null>>): void => {
+    ipcMain.handle(channel, async (event) => {
+      if (!isTrustedSender(event, window, rendererUrl))
+        return failure(new AppError('UNAVAILABLE', '请求来源无效。'));
+      return run();
+    });
+  };
+  guarded(CHANNELS.backupLibrary, () =>
+    backupWithDialog(
+      () =>
+        saveDialog({
+          title: '选择备份位置',
+          defaultPath: `Memocraft-备份-${stamp()}`,
+          buttonLabel: '备份到这里',
+          properties: ['createDirectory'],
+        }),
+      deps.request,
+    ),
+  );
+  guarded(CHANNELS.exportLibrary, () =>
+    exportWithDialog(
+      () =>
+        saveDialog({
+          title: '选择导出位置',
+          defaultPath: `Memocraft-导出-${stamp()}`,
+          buttonLabel: '导出到这里',
+          properties: ['createDirectory'],
+        }),
+      deps.request,
+    ),
+  );
+  guarded(CHANNELS.restoreLibrary, () =>
+    stageRestoreWithDialog(
+      () =>
+        dialog.showOpenDialog(window, {
+          title: '选择备份目录包或数据库快照',
+          buttonLabel: '校验这个备份',
+          properties: ['openDirectory', 'openFile'],
+        }),
+      deps.request,
+    ),
+  );
+  guarded(CHANNELS.applyRestore, async () => {
+    const result = await applyRestore(deps);
+    return result.ok ? { ok: true, value: null } : result;
+  });
+
   return () => {
     for (const operation of operations) ipcMain.removeHandler(CHANNELS[operation]);
+    for (const channel of [
+      CHANNELS.backupLibrary,
+      CHANNELS.exportLibrary,
+      CHANNELS.restoreLibrary,
+      CHANNELS.applyRestore,
+    ])
+      ipcMain.removeHandler(channel);
     for (const channel of [
       CHANNELS.loadImages,
       CHANNELS.addImages,
@@ -135,4 +238,11 @@ export function registerStoreIpc(
     ])
       ipcMain.removeHandler(channel);
   };
+}
+
+/** 默认名称带日期时间，便于用户区分多次备份。 */
+function stamp(): string {
+  const now = new Date();
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
 }

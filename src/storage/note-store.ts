@@ -8,17 +8,17 @@ import {
   type NoteContent,
   type NoteDraft,
   type NoteEdit,
-  type NoteSearchResult,
 } from '../domain/note';
 import { AppError } from '../shared/errors';
 import {
+  assertMigrationCount,
   checkIntegrity,
   DATABASE_FILENAME,
-  listMigrations,
   migrate,
   requireMigrationVersion,
   transaction,
 } from './database';
+import { NOTE_VISIBLE } from './visibility';
 
 type DatabaseRow = Record<string, SQLOutputValue>;
 
@@ -110,12 +110,19 @@ function draftFromRow(row: DatabaseRow): NoteDraft {
 export class NoteStore {
   private readonly database: DatabaseSync;
 
-  constructor(options: { dataDirectory: string; migrationsDirectory: string }) {
+  constructor(options: {
+    dataDirectory: string;
+    migrationsDirectory: string;
+    /** 本应用的数据结构版本；迁移完成后数据库必须等于它，否则拒绝打开。 */
+    expectedSchemaVersion: number;
+  }) {
     mkdirSync(options.dataDirectory, { recursive: true });
     const filename = join(options.dataDirectory, DATABASE_FILENAME);
     if (existsSync(filename) && statSync(filename).size === 0) {
       throw new AppError('STORAGE', '已有数据库文件为空，可能已损坏。原文件已保留，请从备份恢复。');
     }
+    // 先确认安装自带的迁移文件齐全，再打开库：缺文件时报出真实原因，不误报数据版本问题。
+    assertMigrationCount(options.migrationsDirectory, options.expectedSchemaVersion);
     this.database = new DatabaseSync(filename);
     try {
       this.database.exec('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
@@ -123,8 +130,8 @@ export class NoteStore {
         throw new AppError('STORAGE', '数据库外键保护未能启用。');
       checkIntegrity(this.database);
       migrate(this.database, options.migrationsDirectory);
-      // 迁移后再确认版本，附图等其他存储实现可以直接按当前模式准备语句。
-      requireMigrationVersion(this.database, listMigrations(options.migrationsDirectory).length);
+      // 迁移后再确认版本，附图与归纳等其他存储实现可以直接按当前模式准备语句。
+      requireMigrationVersion(this.database, options.expectedSchemaVersion);
       this.database.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;');
     } catch (error) {
       this.database.close();
@@ -136,7 +143,7 @@ export class NoteStore {
     return {
       draft: this.currentDraft(),
       notes: this.database
-        .prepare('SELECT * FROM notes WHERE deleted_at IS NULL ORDER BY created_at DESC, id DESC')
+        .prepare(`SELECT * FROM notes WHERE ${NOTE_VISIBLE} ORDER BY created_at DESC, id DESC`)
         .all()
         .map((row) => this.noteFromRow(row)),
     };
@@ -218,32 +225,15 @@ export class NoteStore {
     });
   }
 
-  search(query: string): NoteSearchResult {
-    // 参数绑定不消除 LIKE 通配语义，仍需转义用户输入的 %、_ 和反斜线。
-    const escaped = query.trim().replace(/[\\%_]/g, (character) => `\\${character}`);
-    if (!escaped) {
-      const rows = this.database
-        .prepare(
-          'SELECT * FROM notes WHERE deleted_at IS NULL ORDER BY created_at DESC, id DESC LIMIT 5',
-        )
-        .all();
-      return { notes: rows.map((row) => this.noteFromRow(row)), hasMore: false };
-    }
-    // 多取一条只用于判断是否截断，界面最多接收 50 条结果。
-    const pattern = `%${escaped}%`;
-    const rows = this.database
-      .prepare(
-        `SELECT notes.* FROM notes WHERE deleted_at IS NULL AND (
-      title LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\' OR EXISTS (
-        SELECT 1 FROM note_tags JOIN tags ON tags.id = note_tags.tag_id
-        WHERE note_tags.note_id = notes.id AND tags.name LIKE ? ESCAPE '\\'
-      )) ORDER BY created_at DESC, id DESC LIMIT 51`,
-      )
-      .all(pattern, pattern, pattern);
-    return {
-      notes: rows.slice(0, 50).map((row) => this.noteFromRow(row)),
-      hasMore: rows.length > 50,
-    };
+  /** 软删除手记：只标记时间，草稿、收录关系与引用都不受影响。 */
+  remove(noteId: string): void {
+    transaction(this.database, () => {
+      const note = this.requireNote(noteId);
+      const now = new Date().toISOString();
+      this.database
+        .prepare('UPDATE notes SET deleted_at = ?, updated_at = ? WHERE id = ?')
+        .run(now, now, note.id);
+    });
   }
 
   close(): void {
@@ -276,7 +266,7 @@ export class NoteStore {
 
   private findNote(id: string, includeDeleted = false): Note | null {
     const row = this.database
-      .prepare(`SELECT * FROM notes WHERE id = ? ${includeDeleted ? '' : 'AND deleted_at IS NULL'}`)
+      .prepare(`SELECT * FROM notes WHERE id = ? ${includeDeleted ? '' : `AND ${NOTE_VISIBLE}`}`)
       .get(id);
     return row ? this.noteFromRow(row) : null;
   }

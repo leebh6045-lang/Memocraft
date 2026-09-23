@@ -1,16 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { categoryLabel, noteTitle, type Note } from '../../../domain/note';
+import { formatFullTime, formatTime } from '../format-time';
 
-const props = defineProps<{ note: Note; highlighted?: boolean }>();
+const props = defineProps<{ note: Note; highlighted?: boolean; topics?: string[] }>();
 defineEmits<{ open: [id: string] }>();
 
-const createdDate = computed(() =>
-  new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit' }).format(
-    new Date(props.note.createdAt),
-  ),
-);
-const fullCreatedDate = computed(() => new Date(props.note.createdAt).toLocaleString('zh-CN'));
+const createdLabel = computed(() => formatTime(props.note.createdAt));
+const fullCreatedDate = computed(() => formatFullTime(props.note.createdAt));
 </script>
 
 <template>
@@ -22,12 +19,13 @@ const fullCreatedDate = computed(() => new Date(props.note.createdAt).toLocaleSt
   >
     <span class="card-meta">
       <span class="cat" :class="`cat-${note.category}`">{{ categoryLabel(note.category) }}</span>
-      <time :datetime="note.createdAt" :title="fullCreatedDate">{{ createdDate }}</time>
+      <time :datetime="note.createdAt" :title="fullCreatedDate">{{ createdLabel }}</time>
     </span>
     <span class="card-title">{{ noteTitle(note) }}</span>
     <span class="card-excerpt">{{ note.body }}</span>
-    <span v-if="note.tags.length" class="card-foot">
+    <span v-if="note.tags.length || props.topics?.length" class="card-foot">
       <span v-for="tag in note.tags" :key="tag" class="tag">{{ tag }}</span>
+      <span v-if="props.topics?.length">收录于 {{ props.topics.join('、') }}</span>
     </span>
   </button>
 </template>

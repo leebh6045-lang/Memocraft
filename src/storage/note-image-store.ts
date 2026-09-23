@@ -17,10 +17,10 @@ import {
 } from '../domain/note-image';
 import { AppError } from '../shared/errors';
 import { requireMigrationVersion, transaction } from './database';
+import { SCHEMA_VERSION } from './schema';
+import { IMAGE_SELF_VISIBLE, NOTE_VISIBLE } from './visibility';
 
 export const ATTACHMENTS_DIRECTORY = 'attachments';
-/** 001_notes.sql 与 002_note_images.sql 之后的模式版本；note_images 表在此版本才存在。 */
-const REQUIRED_SCHEMA_VERSION = 2;
 
 type DatabaseRow = Record<string, SQLOutputValue>;
 
@@ -55,8 +55,10 @@ export class NoteImageStore {
   constructor(
     private readonly database: DatabaseSync,
     dataDirectory: string,
+    /** 期望的库版本；默认当前应用版本。读取旧版本库的迁移/备份用例会显式传入较小值。 */
+    expectedSchemaVersion: number = SCHEMA_VERSION,
   ) {
-    requireMigrationVersion(database, REQUIRED_SCHEMA_VERSION);
+    requireMigrationVersion(database, expectedSchemaVersion);
     this.attachmentsDirectory = join(dataDirectory, ATTACHMENTS_DIRECTORY);
   }
 
@@ -65,7 +67,7 @@ export class NoteImageStore {
     if (!this.findNote(noteId)) return { images: [], totalBytes: 0 };
     const rows = this.database
       .prepare(
-        'SELECT * FROM note_images WHERE note_id = ? AND deleted_at IS NULL ORDER BY position, id',
+        `SELECT * FROM note_images WHERE note_id = ? AND ${IMAGE_SELF_VISIBLE} ORDER BY position, id`,
       )
       .all(noteId);
     const images = rows.map((row) => this.imageFromRow(row));
@@ -153,7 +155,7 @@ export class NoteImageStore {
     transaction(this.database, () => {
       // 软删除只标记时间：文件保留，回收站语义与手记、归纳保持一致。
       this.database
-        .prepare('UPDATE note_images SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL')
+        .prepare(`UPDATE note_images SET deleted_at = ? WHERE id = ? AND ${IMAGE_SELF_VISIBLE}`)
         .run(new Date().toISOString(), imageId);
     });
     return this.list(image.noteId);
@@ -229,14 +231,14 @@ export class NoteImageStore {
   private findNote(noteId: string): boolean {
     // 只做存在性与软删除判断，不复制手记读取逻辑。
     const row = this.database
-      .prepare('SELECT 1 AS present FROM notes WHERE id = ? AND deleted_at IS NULL')
+      .prepare(`SELECT 1 AS present FROM notes WHERE id = ? AND ${NOTE_VISIBLE}`)
       .get(noteId);
     return row !== undefined;
   }
 
   private requireImage(imageId: string): NoteImage {
     const row = this.database
-      .prepare('SELECT * FROM note_images WHERE id = ? AND deleted_at IS NULL')
+      .prepare(`SELECT * FROM note_images WHERE id = ? AND ${IMAGE_SELF_VISIBLE}`)
       .get(imageId);
     if (!row) throw new AppError('NOT_FOUND', '图片不存在或已删除。');
     return this.imageFromRow(row);

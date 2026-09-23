@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { NOTE_CATEGORIES, type Note, type NoteCategory } from '../../../domain/note';
+import type { TopicSummary } from '../../../domain/topic';
 import NoteCard from '../components/NoteCard.vue';
 import AppIcon from '../components/AppIcon.vue';
 
@@ -9,6 +10,8 @@ const props = defineProps<{
   filter: NoteCategory | 'all';
   tag: string;
   highlighted: string | null;
+  /** 归纳列表：卡片脚注据此显示「收录于 …」，没有收录就不显示。 */
+  topics: TopicSummary[];
 }>();
 const emit = defineEmits<{
   open: [id: string];
@@ -24,6 +27,8 @@ const filtered = computed(() =>
   ),
 );
 const tags = computed(() => [...new Set(props.notes.flatMap((note) => note.tags))].sort());
+const topicsOfNote = (noteId: string): string[] =>
+  props.topics.filter((topic) => topic.noteIds.includes(noteId)).map((topic) => topic.title);
 </script>
 
 <template>
@@ -76,6 +81,7 @@ const tags = computed(() => [...new Set(props.notes.flatMap((note) => note.tags)
         :key="note.id"
         :note="note"
         :highlighted="highlighted === note.id"
+        :topics="topicsOfNote(note.id)"
         @open="emit('open', $event)"
       />
     </TransitionGroup>

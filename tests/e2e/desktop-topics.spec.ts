@@ -1,0 +1,183 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { test, expect, _electron as electron, type ElectronApplication } from '@playwright/test';
+
+/**
+ * 验收场景 3：一条手记被两个归纳收录，编辑正文后两处一致；
+ * 移出或删除一个归纳不丢失手记与另一处关联。
+ */
+test('真实桌面：新建归纳、多重收录、抽屉反查与移出', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'memocraft-topics-'));
+  let app: ElectronApplication | undefined;
+  const launch = () =>
+    electron.launch({
+      executablePath: process.env.MEMOCRAFT_TEST_APP,
+      args: process.env.MEMOCRAFT_TEST_APP ? [] : [resolve('.')],
+      env: { ...process.env, MEMOCRAFT_DATA_DIR: directory },
+    });
+  const quit = async (current: ElectronApplication) => {
+    const stopped = current.waitForEvent('close');
+    await current.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0]?.close();
+    });
+    await stopped;
+  };
+
+  try {
+    app = await launch();
+    const page = await app.firstWindow();
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    const body = page.getByRole('textbox', { name: '手记正文', exact: true });
+    await expect(body).toBeVisible();
+
+    // 两条手记：分别提交，草稿在提交后重新开始。
+    await body.fill('归纳验收样例一：事务回滚');
+    await page.getByRole('button', { name: '保存手记', exact: true }).click();
+    await expect(body).toHaveValue('');
+    await body.fill('归纳验收样例二：证书链排查');
+    await page.getByRole('button', { name: '保存手记', exact: true }).click();
+    await expect(body).toHaveValue('');
+
+    // 首页「新建归纳」应直接进入归纳模块并打开新建表单。
+    await page
+      .getByRole('button', { name: /新建归纳/ })
+      .first()
+      .click();
+    const createDialog = page.getByRole('dialog', { name: '新建归纳' });
+    await expect(createDialog).toBeVisible();
+    await createDialog.getByRole('textbox', { name: '标题', exact: true }).fill('本地数据库');
+    await createDialog
+      .getByRole('textbox', { name: '说明（可选）', exact: true })
+      .fill('事务、备份与查询');
+    await createDialog.getByRole('button', { name: '创建', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '本地数据库', exact: true })).toBeVisible();
+    // 详情页说明就地可编辑：改动后自动保存并给出状态反馈。
+    await page
+      .getByRole('textbox', { name: '说明', exact: true })
+      .fill('事务、备份与查询（已核对）');
+    await expect(page.locator('.draft-status')).toContainText('已保存', { timeout: 8000 });
+    await expect(page.getByRole('textbox', { name: '说明', exact: true })).toHaveValue(
+      '事务、备份与查询（已核对）',
+    );
+
+    // 第二个归纳：从列表页新建。
+    await page
+      .getByRole('button', { name: /知识归纳/ })
+      .first()
+      .click();
+    await page
+      .getByRole('button', { name: /新建归纳/ })
+      .first()
+      .click();
+    await page
+      .getByRole('dialog', { name: '新建归纳' })
+      .getByRole('textbox', { name: '标题' })
+      .fill('服务器运维');
+    await page
+      .getByRole('dialog', { name: '新建归纳' })
+      .getByRole('button', { name: '创建' })
+      .click();
+    await expect(page.getByRole('heading', { name: '服务器运维', exact: true })).toBeVisible();
+
+    // 收录第一条手记：选择器里勾选后一次提交。
+    // 详情页页头与空状态各有一个同名入口，这里固定用页头那个。
+    const collectButton = page.locator('.page-head').getByRole('button', { name: '收录已有手记' });
+    const collectInto = async (noteTitleText: string) => {
+      await collectButton.click();
+      const picker = page.getByRole('dialog', { name: '收录手记' });
+      await expect(picker).toBeVisible();
+      await picker.getByRole('checkbox', { name: noteTitleText }).check();
+      await expect(picker.getByText('已选 1 条')).toBeVisible();
+      await picker.getByRole('button', { name: '收录', exact: true }).click();
+      await expect(picker).toHaveCount(0);
+    };
+    await collectInto('归纳验收样例一：事务回滚');
+    await expect(page.locator('.card-title')).toHaveCount(1);
+    await expect(page.getByText('已收录 1 条手记')).toBeVisible();
+
+    // 第二个归纳也收录同一条手记。
+    await page
+      .getByRole('button', { name: /知识归纳/ })
+      .first()
+      .click();
+    // 集合卡片的可读名称带序号，按文本定位更稳。
+    await page.locator('.card.collection').filter({ hasText: '本地数据库' }).click();
+    await expect(page.getByRole('heading', { name: '本地数据库', exact: true })).toBeVisible();
+    await collectInto('归纳验收样例一：事务回滚');
+
+    await page.screenshot({ path: 'test-results/topics-detail.png', animations: 'disabled' });
+
+    // 抽屉反查：手记应显示所属的两个归纳。
+    await page
+      .getByRole('button', { name: /随手记/ })
+      .first()
+      .click();
+    await expect(page.getByRole('heading', { name: '随手记', exact: true })).toBeVisible();
+    // 等切页过渡结束再点卡片，否则会点在正在离场的旧页面上。
+    await expect(page.locator('.page-enter-active')).toHaveCount(0);
+    // 列表按时间倒序，这里要打开被收录的那一条（样例一），不是最新的那条。
+    await page.locator('.card').filter({ hasText: '归纳验收样例一' }).click();
+    const drawer = page.getByRole('dialog', { name: '手记详情' });
+    await expect(drawer).toBeVisible();
+    const collectSection = drawer.locator('.drawer-meta');
+    await expect(
+      collectSection.getByRole('button', { name: '本地数据库', exact: true }),
+    ).toBeVisible();
+    await expect(
+      collectSection.getByRole('button', { name: '服务器运维', exact: true }),
+    ).toBeVisible();
+    await page.screenshot({ path: 'test-results/topics-drawer.png', animations: 'disabled' });
+
+    // 改正文后两个归纳仍然收录同一条手记。
+    await drawer
+      .getByRole('textbox', { name: '编辑手记正文' })
+      .fill('归纳验收样例一：事务回滚（已核对）');
+    await expect(drawer.getByText('已保存', { exact: true })).toBeVisible();
+
+    // 从抽屉移出一个归纳：手记仍在随手记，另一个归纳的收录不受影响。
+    await collectSection.getByRole('button', { name: '从「本地数据库」移出', exact: true }).click();
+    await expect(
+      collectSection.getByRole('button', { name: '本地数据库', exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      collectSection.getByRole('button', { name: '服务器运维', exact: true }),
+    ).toBeVisible();
+    // 连续操作会有多条提示条，按文案定位当次那一条。
+    const toast = page.locator('.toast').filter({ hasText: '已从归纳移出' });
+    await expect(toast).toBeVisible();
+    await page.screenshot({ path: 'test-results/topics-undo-toast.png', animations: 'disabled' });
+
+    // 撤销只在提示条存续期间有效：这里点撤销应恢复收录。
+    await toast.getByRole('button', { name: '撤销' }).click();
+    await expect(
+      collectSection.getByRole('button', { name: '本地数据库', exact: true }),
+    ).toBeVisible();
+
+    await drawer.getByRole('button', { name: /^关闭/ }).click();
+    await expect(drawer).toHaveCount(0);
+    await page
+      .getByRole('button', { name: /随手记/ })
+      .first()
+      .click();
+    await expect(page.locator('.card')).toHaveCount(2);
+
+    // 重启后归纳、收录关系与手记都应保留。
+    await quit(app);
+    app = undefined;
+    app = await launch();
+    const reopened = await app.firstWindow();
+    reopened.on('pageerror', (error) => errors.push(error.message));
+    await reopened
+      .getByRole('button', { name: /知识归纳/ })
+      .first()
+      .click();
+    await expect(reopened.locator('.card.collection')).toHaveCount(2);
+    await expect(reopened.getByText('1 条手记').first()).toBeVisible();
+    expect(errors).toEqual([]);
+  } finally {
+    if (app) await quit(app);
+    await rm(directory, { recursive: true, force: true });
+  }
+});

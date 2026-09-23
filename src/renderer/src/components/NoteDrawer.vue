@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, toValue, watch } from 'vue';
-import MarkdownIt from 'markdown-it';
 import { noteTitle, type Note, type NoteContent } from '../../../domain/note';
 import type { MemocraftApi } from '../../../shared/contracts';
+import type { NoteReference } from '../../../domain/thread';
+import type { TopicSummary } from '../../../domain/topic';
 import CategorySelector from './CategorySelector.vue';
 import NoteImageGallery from './NoteImageGallery.vue';
+import NotePickerDialog from './NotePickerDialog.vue';
 import { useModalFocus } from '../composables/useModalFocus';
+import { renderMarkdown } from '../markdown';
 import type { NoteImageState } from '../composables/useNoteImages';
 
 const props = defineProps<{
@@ -15,8 +18,34 @@ const props = defineProps<{
   busy: boolean;
   bridge: MemocraftApi;
   images: NoteImageState;
+  /** 全部归纳与全部手记：收录状态由渲染端持有的同一份数据推导。 */
+  topics: TopicSummary[];
+  notes: Note[];
+  /** 引用这条手记的事务与动态，打开抽屉时按手记 ID 读取。 */
+  references: NoteReference[];
 }>();
-const emit = defineEmits<{ change: [patch: Partial<NoteContent>]; close: []; retry: [] }>();
+const emit = defineEmits<{
+  change: [patch: Partial<NoteContent>];
+  close: [];
+  retry: [];
+  collect: [topicId: string, noteIds: string[]];
+  'remove-topic': [topicId: string, noteId: string];
+  'open-topic': [topicId: string];
+  'open-reference': [reference: NoteReference];
+  'remove-note': [noteId: string];
+}>();
+
+const collecting = ref(false);
+const noteTopics = computed(() =>
+  props.topics.filter((topic) => topic.noteIds.includes(props.note.id)),
+);
+const collectedIds = computed(() => noteTopics.value.map((topic) => topic.id));
+
+/** 收录与移出只上报事件，结果提示与撤销由应用外壳统一给出。 */
+function confirmCollect(topicIds: string[]): void {
+  collecting.value = false;
+  for (const topicId of topicIds) emit('collect', topicId, [props.note.id]);
+}
 const panel = ref<HTMLElement | null>(null);
 const { trapTab } = useModalFocus(panel, '.drawer-text');
 const preview = ref(false);
@@ -93,10 +122,8 @@ function handlePaste(event: ClipboardEvent) {
     });
 }
 
-const markdown = new MarkdownIt({ html: false, linkify: false, breaks: true });
 // 手记正文不解析图片与链接：附图是独立图集，正文保留可读文字与代码。
-markdown.disable(['image', 'link']);
-const renderedBody = computed(() => markdown.render(props.note.body));
+const renderedBody = computed(() => renderMarkdown(props.note.body));
 function updateTags(event: Event) {
   if (!(event.target instanceof HTMLInputElement)) return;
   tagsText.value = event.target.value;
@@ -174,11 +201,38 @@ onBeforeUnmount(() => document.removeEventListener('paste', handlePaste));
           /></label>
           <div>
             <div class="label">收录于归纳</div>
-            <span class="faint">归纳与收录功能尚未开放</span>
+            <div class="chip-row">
+              <span v-for="topic in noteTopics" :key="topic.id" class="chip on"
+                ><button class="chip-label" @click="emit('open-topic', topic.id)">
+                  {{ topic.title }}</button
+                ><button
+                  class="chip-x"
+                  :disabled="busy"
+                  :aria-label="`从「${topic.title}」移出`"
+                  @click="emit('remove-topic', topic.id, props.note.id)"
+                >
+                  ×
+                </button></span
+              >
+              <button class="inline-add" :disabled="busy" @click="collecting = true">
+                ＋ 收录到归纳
+              </button>
+            </div>
           </div>
           <div>
             <div class="label">被引用的位置</div>
-            <span class="faint">事务与引用功能尚未开放</span>
+            <span v-if="!props.references.length" class="faint">还没有被任何事务引用。</span>
+            <div v-else class="entry-refs">
+              <button
+                v-for="(reference, index) in props.references"
+                :key="`${reference.threadId}-${reference.entryId ?? 'thread'}-${index}`"
+                class="ref-chip"
+                @click="emit('open-reference', reference)"
+              >
+                {{ reference.threadTitle }} ·
+                {{ reference.entrySummary ?? '事务资料' }}
+              </button>
+            </div>
           </div>
         </div>
         <NoteImageGallery
@@ -199,8 +253,24 @@ onBeforeUnmount(() => document.removeEventListener('paste', handlePaste));
           <p :class="{ 'error-text': error }" aria-live="polite">{{ error || status }}</p>
         </div>
         <button v-if="error" class="btn-ghost" @click="emit('retry')">重试保存</button>
+        <button
+          v-else
+          class="btn-quiet btn-danger"
+          :disabled="busy"
+          @click="emit('remove-note', props.note.id)"
+        >
+          移到回收站
+        </button>
       </footer>
     </aside>
+    <NotePickerDialog
+      v-if="collecting"
+      :notes="props.notes"
+      :collected-ids="collectedIds"
+      :busy="busy"
+      @confirm="confirmCollect"
+      @close="collecting = false"
+    />
   </div>
 </template>
 
@@ -216,5 +286,12 @@ onBeforeUnmount(() => document.removeEventListener('paste', handlePaste));
 }
 .error-text {
   color: #b3473f;
+}
+.chip-label {
+  color: inherit;
+  font: inherit;
+}
+.chip-label:hover {
+  text-decoration: underline;
 }
 </style>

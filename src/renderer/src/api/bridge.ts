@@ -1,6 +1,9 @@
 import type { MemocraftApi } from '../../../shared/contracts';
 import type { Result } from '../../../shared/errors';
 import type { NoteImageList } from '../../../domain/note-image';
+import type { TopicSummary } from '../../../domain/topic';
+import type { EntrySummary, NoteReference, ThreadSummary } from '../../../domain/thread';
+import type { RemovalImpact, TrashItem } from '../../../domain/trash';
 
 function unavailable(): Promise<Result<never>> {
   return Promise.resolve({
@@ -13,10 +16,16 @@ function unavailable(): Promise<Result<never>> {
 }
 
 const emptyImages: Result<NoteImageList> = { ok: true, value: { images: [], totalBytes: 0 } };
+const emptyTopics: Result<TopicSummary[]> = { ok: true, value: [] };
+const emptyThreads: Result<ThreadSummary[]> = { ok: true, value: [] };
+const emptyEntries: Result<EntrySummary[]> = { ok: true, value: [] };
+const emptyReferences: Result<NoteReference[]> = { ok: true, value: [] };
+const emptyTrash: Result<TrashItem[]> = { ok: true, value: [] };
 
 /**
  * 普通浏览器不伪造保存能力：所有数据方法返回同一条明确失败。
- * 图集方法返回空列表，使界面在未接入桌面能力时也能正常渲染空状态。
+ * 图集与归纳的读取返回空集合，使界面在未接入桌面能力时也能正常渲染空状态，
+ * 写入仍然失败，不会出现「看起来保存成功」的假象。
  */
 export const disconnectedApi: MemocraftApi = {
   load: unavailable,
@@ -29,6 +38,30 @@ export const disconnectedApi: MemocraftApi = {
   addImageFromClipboard: () => Promise.resolve(emptyImages),
   renameImage: () => Promise.resolve(emptyImages),
   deleteImage: () => Promise.resolve(emptyImages),
+  loadTopics: () => Promise.resolve(emptyTopics),
+  createTopic: unavailable,
+  updateTopic: unavailable,
+  loadTrash: () => Promise.resolve(emptyTrash),
+  backupLibrary: unavailable,
+  restoreLibrary: unavailable,
+  applyRestore: unavailable,
+  exportLibrary: unavailable,
+  onNotice: () => () => undefined,
+  loadRemovalImpact: (): Promise<Result<RemovalImpact>> => unavailable(),
+  removeItem: unavailable,
+  restoreItem: unavailable,
+  addNotesToTopic: unavailable,
+  removeNoteFromTopic: unavailable,
+  loadThreads: () => Promise.resolve(emptyThreads),
+  createThread: unavailable,
+  updateThread: unavailable,
+  archiveThread: unavailable,
+  addNotesToThread: unavailable,
+  removeNoteFromThread: unavailable,
+  loadEntries: () => Promise.resolve(emptyEntries),
+  createEntry: unavailable,
+  updateEntry: unavailable,
+  loadNoteReferences: () => Promise.resolve(emptyReferences),
   onCloseRequested: () => () => undefined,
   onCloseCancelled: () => () => undefined,
   closeReady: () => undefined,

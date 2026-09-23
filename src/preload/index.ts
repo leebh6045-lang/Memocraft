@@ -15,6 +15,40 @@ const api: MemocraftApi = {
   renameImage: (imageId, displayName) =>
     ipcRenderer.invoke(CHANNELS.renameImage, { imageId, displayName }),
   deleteImage: (imageId) => ipcRenderer.invoke(CHANNELS.deleteImage, imageId),
+  loadTopics: () => ipcRenderer.invoke(CHANNELS.loadTopics),
+  createTopic: (input) => ipcRenderer.invoke(CHANNELS.createTopic, input),
+  updateTopic: (edit) => ipcRenderer.invoke(CHANNELS.updateTopic, edit),
+  loadTrash: () => ipcRenderer.invoke(CHANNELS.loadTrash),
+  // 备份、恢复与导出的目标路径由主进程弹出对话框选择，渲染端不传路径。
+  backupLibrary: () => ipcRenderer.invoke(CHANNELS.backupLibrary),
+  restoreLibrary: () => ipcRenderer.invoke(CHANNELS.restoreLibrary),
+  applyRestore: () => ipcRenderer.invoke(CHANNELS.applyRestore),
+  exportLibrary: () => ipcRenderer.invoke(CHANNELS.exportLibrary),
+  onNotice: (listener) => {
+    const handler = (_event: unknown, message: string): void => listener(message);
+    ipcRenderer.on(CHANNELS.appNotice, handler);
+    return () => ipcRenderer.removeListener(CHANNELS.appNotice, handler);
+  },
+  loadRemovalImpact: (kind, id) => ipcRenderer.invoke(CHANNELS.loadRemovalImpact, { kind, id }),
+  removeItem: (kind, id) => ipcRenderer.invoke(CHANNELS.removeItem, { kind, id }),
+  restoreItem: (kind, id) => ipcRenderer.invoke(CHANNELS.restoreItem, { kind, id }),
+  addNotesToTopic: (topicId, noteIds) =>
+    ipcRenderer.invoke(CHANNELS.addNotesToTopic, { topicId, noteIds }),
+  removeNoteFromTopic: (topicId, noteId) =>
+    ipcRenderer.invoke(CHANNELS.removeNoteFromTopic, { topicId, noteId }),
+  loadThreads: (includeArchived) => ipcRenderer.invoke(CHANNELS.loadThreads, includeArchived),
+  createThread: (input) => ipcRenderer.invoke(CHANNELS.createThread, input),
+  updateThread: (edit) => ipcRenderer.invoke(CHANNELS.updateThread, edit),
+  archiveThread: (threadId, archived, expectedRevision) =>
+    ipcRenderer.invoke(CHANNELS.archiveThread, { threadId, archived, expectedRevision }),
+  addNotesToThread: (threadId, noteIds) =>
+    ipcRenderer.invoke(CHANNELS.addNotesToThread, { threadId, noteIds }),
+  removeNoteFromThread: (threadId, noteId) =>
+    ipcRenderer.invoke(CHANNELS.removeNoteFromThread, { threadId, noteId }),
+  loadEntries: (threadId, order) => ipcRenderer.invoke(CHANNELS.loadEntries, { threadId, order }),
+  createEntry: (input) => ipcRenderer.invoke(CHANNELS.createEntry, input),
+  updateEntry: (edit) => ipcRenderer.invoke(CHANNELS.updateEntry, edit),
+  loadNoteReferences: (noteId) => ipcRenderer.invoke(CHANNELS.loadNoteReferences, noteId),
   onCloseRequested: (listener) => {
     const handler = (): void => listener();
     ipcRenderer.on(CHANNELS.closeRequested, handler);
