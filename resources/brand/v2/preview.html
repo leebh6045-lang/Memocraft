@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="zh-CN">
+  <meta charset="utf-8" />
+  <title>Memocraft 品牌标识 V2 · 候选对比</title>
+  <style>
+    :root {
+      color-scheme: light;
+    }
+    body {
+      margin: 0;
+      padding: 40px;
+      background: #f7f6f3;
+      color: #25242a;
+      font:
+        14px/1.7 -apple-system,
+        BlinkMacSystemFont,
+        'PingFang SC',
+        'Segoe UI',
+        sans-serif;
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      margin: 0 0 6px;
+    }
+    .lede {
+      color: #6d6b73;
+      margin: 0 0 32px;
+      max-width: 720px;
+    }
+    .candidate {
+      background: #fff;
+      border: 1px solid #e4e1da;
+      border-radius: 16px;
+      padding: 24px 28px 28px;
+      margin-bottom: 24px;
+    }
+    h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0 0 18px;
+    }
+    .sizes {
+      display: flex;
+      align-items: flex-end;
+      gap: 22px;
+      margin-bottom: 22px;
+    }
+    figure {
+      margin: 0;
+      text-align: center;
+    }
+    figcaption {
+      color: #9c9aa3;
+      font-size: 12px;
+      margin-top: 6px;
+    }
+    .marks {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+    .tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 150px;
+      height: 104px;
+      border-radius: 12px;
+      font-size: 12px;
+    }
+    .tile.light {
+      background: #f7f6f3;
+      border: 1px solid #e4e1da;
+      color: #6d6b73;
+    }
+    .tile.dark {
+      background: #1f2025;
+      color: #a09fa8;
+    }
+    .lockup {
+      width: 500px;
+      height: 140px;
+      display: block;
+    }
+    footer {
+      color: #9c9aa3;
+      font-size: 12px;
+      margin-top: 32px;
+    }
+  </style>
+  <h1>Memocraft 品牌标识 V2 · 候选对比</h1>
+  <p class="lede">
+    两个方向都只使用界面基准里已有的设计令牌（强调色 #3b5b7c、强调浅 #8fb0d6、 语义色 #b8862b 与纸色
+    #f7f6f3），替换掉旧标识中与应用无关的暖米色。 重点看同一行的 16px
+    是否仍能读出层级，以及深色界面上的表现。
+  </p>
+  <section class="candidate">
+    <h2>甲 · 三级层叠</h2>
+    <div class="sizes">
+      <figure>
+        <img src="app-icon-jia-stack.svg" width="128" height="128" alt="" />
+        <figcaption>128</figcaption>
+      </figure>
+      <figure>
+        <img src="app-icon-jia-stack.svg" width="64" height="64" alt="" />
+        <figcaption>64</figcaption>
+      </figure>
+      <figure>
+        <img src="app-icon-jia-stack.svg" width="32" height="32" alt="" />
+        <figcaption>32</figcaption>
+      </figure>
+      <figure>
+        <img src="app-icon-jia-stack.svg" width="16" height="16" alt="" />
+        <figcaption>16</figcaption>
+      </figure>
+    </div>
+    <div class="marks">
+      <div class="tile light">
+        <img src="mark-jia-stack.svg" width="56" height="56" alt="" /><span>浅色界面</span>
+      </div>
+      <div class="tile dark">
+        <img src="mark-jia-stack-on-dark.svg" width="56" height="56" alt="" /><span>深色界面</span>
+      </div>
+      <div class="tile light">
+        <img src="mark-jia-stack-mono.svg" width="28" height="28" alt="" /><span>单色 28px</span>
+      </div>
+    </div>
+  </section>
+  <section class="candidate">
+    <h2>乙 · 折角纸页</h2>
+    <div class="sizes">
+      <figure>
+        <img src="app-icon-yi-fold.svg" width="128" height="128" alt="" />
+        <figcaption>128</figcaption>
+      </figure>
+      <figure>
+        <img src="app-icon-yi-fold.svg" width="64" height="64" alt="" />
+        <figcaption>64</figcaption>
+      </figure>
+      <figure>
+        <img src="app-icon-yi-fold.svg" width="32" height="32" alt="" />
+        <figcaption>32</figcaption>
+      </figure>
+      <figure>
+        <img src="app-icon-yi-fold.svg" width="16" height="16" alt="" />
+        <figcaption>16</figcaption>
+      </figure>
+    </div>
+    <div class="marks">
+      <div class="tile light">
+        <img src="mark-yi-fold.svg" width="56" height="56" alt="" /><span>浅色界面</span>
+      </div>
+      <div class="tile dark">
+        <img src="mark-yi-fold-on-dark.svg" width="56" height="56" alt="" /><span>深色界面</span>
+      </div>
+      <div class="tile light">
+        <img src="mark-yi-fold-mono.svg" width="28" height="28" alt="" /><span>单色 28px</span>
+      </div>
+    </div>
+    <img class="lockup" src="lockup-yi-fold.svg" alt="" />
+  </section>
+  <footer>
+    生成脚本：.local/brand-v2-render/build-assets.mjs · 标识几何改动后重新运行即可覆盖本目录
+  </footer>
+</html>
