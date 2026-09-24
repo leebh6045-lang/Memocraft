@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { CHANNELS, type MemocraftApi } from '../shared/contracts';
+import { APP_VERSION_ARGUMENT, CHANNELS, type MemocraftApi } from '../shared/contracts';
 
 // 桥接层仅转发白名单调用；输入校验与业务规则在主进程侧执行。
 const api: MemocraftApi = {
@@ -63,5 +63,10 @@ const api: MemocraftApi = {
   closeCancelled: () => ipcRenderer.send(CHANNELS.closeCancelled),
   platform:
     process.platform === 'darwin' ? 'mac' : process.platform === 'win32' ? 'windows' : 'linux',
+  // 启动参数由主进程写死（见 window.ts）：拿不到时留空，界面不显示版本，而不是编一个。
+  version:
+    process.argv
+      .find((argument) => argument.startsWith(`${APP_VERSION_ARGUMENT}=`))
+      ?.slice(APP_VERSION_ARGUMENT.length + 1) ?? '',
 };
 contextBridge.exposeInMainWorld('memocraft', api);

@@ -1,6 +1,7 @@
 import { app, BrowserWindow, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { APP_VERSION_ARGUMENT } from '../shared/contracts';
 
 export function getApplicationIconPath(): string {
   return app.isPackaged
@@ -28,6 +29,9 @@ export function createWindow(): BrowserWindow {
       nodeIntegration: false,
       webviewTag: false,
       spellcheck: false,
+      // 版本号只有一个来源：应用自己的版本（打包配置里的 version）。
+      // 沙箱化的 preload 拿不到 app.getVersion()，因此随启动参数传进去。
+      additionalArguments: [`${APP_VERSION_ARGUMENT}=${app.getVersion()}`],
     },
   });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
