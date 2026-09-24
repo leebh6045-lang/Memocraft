@@ -3,8 +3,7 @@
 /mym/
 /docs/thinking/
 /docs/历史文档/
-/resources/brand/moon/
-/resources/brand/origami-m/
+
 
 # Dependencies and generated artifacts
 /node_modules/
@@ -39,4 +38,5 @@
 .DS_Store
 Thumbs.db
 *.log
-/resources/
+/resources/brand/moon/
+/resources/brand/origami-m/
