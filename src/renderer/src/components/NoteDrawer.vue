@@ -3,13 +3,18 @@ import { computed, onBeforeUnmount, onMounted, ref, toValue, watch } from 'vue';
 import { noteTitle, type Note, type NoteContent } from '../../../domain/note';
 import type { MemocraftApi } from '../../../shared/contracts';
 import type { NoteReference } from '../../../domain/thread';
-import type { TopicSummary } from '../../../domain/topic';
+import type { TopicCreate, TopicSummary } from '../../../domain/topic';
 import CategorySelector from './CategorySelector.vue';
 import NoteImageGallery from './NoteImageGallery.vue';
-import NotePickerDialog from './NotePickerDialog.vue';
+import PickerDialog from './PickerDialog.vue';
+import TopicCreateDialog from './TopicCreateDialog.vue';
 import { useModalFocus } from '../composables/useModalFocus';
 import { renderMarkdown } from '../markdown';
+import { topicPickerOptions } from '../picker';
 import type { NoteImageState } from '../composables/useNoteImages';
+
+/** 新建归纳的结果：失败原因直接展示在表单里，成功则把新归纳交给调用方继续处理。 */
+export type CreateTopicResult = { ok: true; topic: TopicSummary } | { ok: false; message: string };
 
 const props = defineProps<{
   note: Note;
@@ -23,6 +28,10 @@ const props = defineProps<{
   notes: Note[];
   /** 引用这条手记的事务与动态，打开抽屉时按手记 ID 读取。 */
   references: NoteReference[];
+  /** 归纳操作失败的原因（收录、移出、新建）：显示在「收录于归纳」下方，不留静默失败。 */
+  topicError?: string;
+  /** 抽屉里的「新建归纳」：由应用外壳创建，返回结果供表单继续显示或勾选。 */
+  createTopic: (input: TopicCreate) => Promise<CreateTopicResult>;
 }>();
 const emit = defineEmits<{
   change: [patch: Partial<NoteContent>];
@@ -36,10 +45,38 @@ const emit = defineEmits<{
 }>();
 
 const collecting = ref(false);
+const creatingTopic = ref(false);
+const createError = ref('');
+/** 选择器里的勾选由抽屉持有：新建的归纳要能被直接勾上，和已选的归纳一起提交。 */
+const pickedTopicIds = ref<string[]>([]);
 const noteTopics = computed(() =>
   props.topics.filter((topic) => topic.noteIds.includes(props.note.id)),
 );
 const collectedIds = computed(() => noteTopics.value.map((topic) => topic.id));
+/** 这条手记能收录到哪些归纳：全部列出，已经收录的带标记且不可重复选择。 */
+const topicOptions = computed(() => topicPickerOptions(props.topics, collectedIds.value));
+
+function openPicker(): void {
+  pickedTopicIds.value = [];
+  collecting.value = true;
+}
+
+function openCreateTopic(): void {
+  createError.value = '';
+  creatingTopic.value = true;
+}
+
+async function submitNewTopic(input: TopicCreate): Promise<void> {
+  const result = await props.createTopic(input);
+  if (!result.ok) {
+    createError.value = result.message;
+    return;
+  }
+  createError.value = '';
+  creatingTopic.value = false;
+  // 新建的归纳直接勾上，用户接着点「收录」一次提交。
+  pickedTopicIds.value = [...pickedTopicIds.value, result.topic.id];
+}
 
 /** 收录与移出只上报事件，结果提示与撤销由应用外壳统一给出。 */
 function confirmCollect(topicIds: string[]): void {
@@ -214,10 +251,11 @@ onBeforeUnmount(() => document.removeEventListener('paste', handlePaste));
                   ×
                 </button></span
               >
-              <button class="inline-add" :disabled="busy" @click="collecting = true">
-                ＋ 收录到归纳
-              </button>
+              <button class="inline-add" :disabled="busy" @click="openPicker">＋ 收录到归纳</button>
             </div>
+            <p v-if="props.topicError" class="hint error-text" role="alert">
+              {{ props.topicError }}
+            </p>
           </div>
           <div>
             <div class="label">被引用的位置</div>
@@ -263,13 +301,30 @@ onBeforeUnmount(() => document.removeEventListener('paste', handlePaste));
         </button>
       </footer>
     </aside>
-    <NotePickerDialog
+    <PickerDialog
       v-if="collecting"
-      :notes="props.notes"
-      :collected-ids="collectedIds"
+      v-model:picked="pickedTopicIds"
+      title="收录到归纳"
+      hint="选择要把这条手记收录到的归纳，可多选后一次提交；已经收录的归纳会标出来。"
+      search-label="搜索归纳"
+      search-placeholder="搜索归纳标题或说明"
+      :options="topicOptions"
+      :linked-count="0"
+      empty-text="还没有归纳，先新建一个再收录。"
+      all-linked-text="这条手记已经收录在全部归纳里了。"
+      unit="个"
+      create-label="＋ 新建归纳"
       :busy="busy"
       @confirm="confirmCollect"
+      @create="openCreateTopic"
       @close="collecting = false"
+    />
+    <TopicCreateDialog
+      v-if="creatingTopic"
+      :busy="busy"
+      :error="createError"
+      @submit="submitNewTopic"
+      @close="creatingTopic = false"
     />
   </div>
 </template>

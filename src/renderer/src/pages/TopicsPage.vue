@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
 import type { Note } from '../../../domain/note';
-import { emptyTopicDraft } from '../../../domain/topic';
-import AppDialog from '../components/AppDialog.vue';
+import type { TopicCreate } from '../../../domain/topic';
 import NoteCard from '../components/NoteCard.vue';
-import NotePickerDialog from '../components/NotePickerDialog.vue';
+import PickerDialog from '../components/PickerDialog.vue';
+import TopicCreateDialog from '../components/TopicCreateDialog.vue';
+import { notePickerOptions } from '../picker';
 import { formatTime } from '../format-time';
 import SideDrawer from '../components/SideDrawer.vue';
 import type { TopicState } from '../composables/useTopics';
@@ -37,7 +38,6 @@ const activeId = ref<string | null>(null);
 const activeTopic = computed(() => topics.value.find((item) => item.id === activeId.value) ?? null);
 
 const creating = ref(false);
-const draft = ref(emptyTopicDraft());
 const duplicateHint = ref('');
 const pickingFor = ref<string | null>(null);
 /** 基础信息在右侧抽屉里编辑，页面只读展示标题。 */
@@ -96,7 +96,6 @@ function syncEditingFields(): void {
 watch(activeId, syncEditingFields);
 
 async function openCreate(): Promise<void> {
-  draft.value = emptyTopicDraft();
   duplicateHint.value = '';
   creating.value = true;
 }
@@ -129,12 +128,8 @@ watch(() => props.navSignal, consumeNavSignal, { immediate: true });
 watch(() => props.createSignal, consumeCreateSignal, { immediate: true });
 watch(() => props.openSignal?.nonce, consumeOpenSignal, { immediate: true });
 
-async function submitCreate(confirmDuplicate = false): Promise<void> {
-  const created = await props.state.create({
-    title: draft.value.title,
-    description: draft.value.description,
-    confirmDuplicate,
-  });
+async function submitCreate(input: TopicCreate): Promise<void> {
+  const created = await props.state.create(input);
   if (!created) {
     // 同名不是失败：提示已有同名项，由用户确认后原样重试。
     duplicateHint.value = topicsError.value;
@@ -180,6 +175,14 @@ async function saveEditing(): Promise<void> {
 }
 
 watch([title, description], scheduleSave);
+
+/** 选择器条目：已在当前归纳里的手记不列出，只在空状态里说明数量。 */
+const pickerOptions = computed(() =>
+  notePickerOptions(
+    props.notes,
+    topics.value.find((item) => item.id === pickingFor.value)?.noteIds ?? [],
+  ),
+);
 
 async function confirmPick(noteIds: string[]): Promise<void> {
   const topicId = pickingFor.value;
@@ -304,50 +307,25 @@ function writeInTopic(): void {
       </div>
     </template>
 
-    <AppDialog
+    <TopicCreateDialog
       v-if="creating"
-      title="新建归纳"
-      hint="标题必填，说明可以稍后补。允许同名，重命名不会重写已收录的关系。"
+      :busy="props.busy"
+      :error="duplicateHint"
+      @submit="submitCreate"
       @close="creating = false"
-    >
-      <label class="field"
-        >标题<input
-          data-autofocus
-          :value="draft.title"
-          maxlength="300"
-          placeholder="例如：本地数据库"
-          @input="draft.title = ($event.target as HTMLInputElement).value"
-      /></label>
-      <label class="field"
-        >说明（可选）<textarea
-          :value="draft.description"
-          rows="2"
-          maxlength="2000"
-          placeholder="这个归纳收集哪一类内容"
-          @input="draft.description = ($event.target as HTMLTextAreaElement).value"
-        />
-      </label>
-      <p v-if="duplicateHint" class="hint duplicate-hint" role="alert">{{ duplicateHint }}</p>
-      <template #footer>
-        <button class="btn-quiet" @click="creating = false">取消</button>
-        <button
-          v-if="duplicateHint"
-          class="btn-primary"
-          :disabled="props.busy"
-          @click="submitCreate(true)"
-        >
-          仍要创建
-        </button>
-        <button v-else class="btn-primary" :disabled="props.busy" @click="submitCreate(false)">
-          创建
-        </button>
-      </template>
-    </AppDialog>
+    />
 
-    <NotePickerDialog
+    <PickerDialog
       v-if="pickingFor"
-      :notes="props.notes"
-      :collected-ids="topics.find((item) => item.id === pickingFor)?.noteIds ?? []"
+      title="收录手记"
+      hint="搜索并选择要收录到当前归纳的手记，可多选后一次提交。"
+      search-label="搜索手记"
+      search-placeholder="搜索标题、正文或标签"
+      :options="pickerOptions.options"
+      :linked-count="pickerOptions.linkedCount"
+      empty-text="没有匹配的手记，换个词或先去写一条。"
+      all-linked-text="全部手记都已收录在这个归纳里。"
+      unit="条"
       :busy="props.busy"
       @confirm="confirmPick"
       @close="pickingFor = null"

@@ -11,8 +11,9 @@ import AppDialog from '../components/AppDialog.vue';
 import AppIcon from '../components/AppIcon.vue';
 import EntryFields from '../components/EntryFields.vue';
 import NoteCard from '../components/NoteCard.vue';
-import NotePickerDialog from '../components/NotePickerDialog.vue';
+import PickerDialog from '../components/PickerDialog.vue';
 import SideDrawer from '../components/SideDrawer.vue';
+import { notePickerOptions } from '../picker';
 import { formatFullTime, formatTime, fromDateTimeInput, toDateTimeInput } from '../format-time';
 import { renderMarkdown } from '../markdown';
 import type { ThreadState } from '../composables/useThreads';
@@ -366,6 +367,14 @@ async function switchOrder(next: TimelineOrder): Promise<void> {
   await refreshEntries();
 }
 
+/** 选择器条目：已引用的手记不列出，只在空状态里说明数量。 */
+const pickerOptions = computed(() =>
+  notePickerOptions(
+    props.notes,
+    picking.value === 'thread' ? (activeThread.value?.noteIds ?? []) : composerNoteIds.value,
+  ),
+);
+
 async function confirmPick(noteIds: string[]): Promise<void> {
   const target = picking.value;
   picking.value = null;
@@ -382,7 +391,10 @@ async function confirmPick(noteIds: string[]): Promise<void> {
         for (const noteId of noteIds) void props.state.removeNote(thread.id, noteId);
       },
     });
+    return;
   }
+  // 关联失败要说出来：静默失败会让用户以为手记已经关联上了。
+  emit('notify', { message: threadsError.value || '关联没有完成，请重试。' });
 }
 
 async function removeDirectNote(noteId: string): Promise<void> {
@@ -640,10 +652,17 @@ onBeforeUnmount(() => clearTimeout(saveTimer));
       </template>
     </AppDialog>
 
-    <NotePickerDialog
+    <PickerDialog
       v-if="picking"
-      :notes="props.notes"
-      :collected-ids="picking === 'thread' ? (activeThread?.noteIds ?? []) : composerNoteIds"
+      title="收录手记"
+      hint="搜索并选择要引用或关联的手记，可多选后一次提交。"
+      search-label="搜索手记"
+      search-placeholder="搜索标题、正文或标签"
+      :options="pickerOptions.options"
+      :linked-count="pickerOptions.linkedCount"
+      empty-text="没有匹配的手记，换个词或先去写一条。"
+      all-linked-text="全部手记都已经在手记库里了。"
+      unit="条"
       :busy="props.busy"
       @confirm="confirmPick"
       @close="picking = null"

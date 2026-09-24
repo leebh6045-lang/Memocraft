@@ -1993,6 +1993,22 @@ html.theme-switching * {
 .pick:hover {
   background: var(--surface-2);
 }
+/* 已关联的条目：留在列表里但不可选，免得用户以为列表漏了东西。 */
+.pick.is-linked {
+  cursor: default;
+  opacity: 0.62;
+}
+.pick.is-linked:hover {
+  background: transparent;
+}
+.pick-badge {
+  flex: none;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+}
 .pick input {
   width: 15px;
   height: 15px;
@@ -2007,7 +2023,7 @@ html.theme-switching * {
   white-space: nowrap;
   font-size: 14px;
 }
-.pick time {
+.pick .pick-meta {
   flex: none;
   font-size: 12px;
   color: var(--faint);

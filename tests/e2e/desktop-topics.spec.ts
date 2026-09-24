@@ -125,18 +125,88 @@ test('真实桌面：新建归纳、多重收录、抽屉反查与移出', async
 
     await page.screenshot({ path: 'test-results/topics-detail.png', animations: 'disabled' });
 
-    // 抽屉反查：手记应显示所属的两个归纳。
+    // 反方向：在手记详情里把这手记收录到一个已有归纳。
+    // 选择器这时必须列归纳（而不是手记），并且把已经收录的归纳标出来。
+    const openNoteDrawer = async (noteTitleText: string) => {
+      await page
+        .getByRole('button', { name: /随手记/ })
+        .first()
+        .click();
+      await expect(page.getByRole('heading', { name: '随手记', exact: true })).toBeVisible();
+      await expect(page.locator('.page-enter-active')).toHaveCount(0);
+      await page.locator('.card').filter({ hasText: noteTitleText }).click();
+      const panel = page.getByRole('dialog', { name: '手记详情' });
+      await expect(panel).toBeVisible();
+      return panel;
+    };
+
+    let noteDrawer = await openNoteDrawer('归纳验收样例二：证书链排查');
+    await noteDrawer.getByRole('button', { name: '＋ 收录到归纳' }).click();
+    const topicPicker = page.getByRole('dialog', { name: '收录到归纳' });
+    await expect(topicPicker).toBeVisible();
+    await expect(topicPicker.getByRole('checkbox', { name: '本地数据库' })).toBeEnabled();
+    await expect(topicPicker.getByRole('checkbox', { name: '服务器运维' })).toBeEnabled();
+    await expect(topicPicker.getByText('已选 0 个')).toBeVisible();
+    await topicPicker.getByRole('checkbox', { name: '本地数据库' }).check();
+    await expect(topicPicker.getByText('已选 1 个')).toBeVisible();
+    await topicPicker.getByRole('button', { name: '收录', exact: true }).click();
+    await expect(topicPicker).toHaveCount(0);
+    await expect(
+      page.locator('.toast').filter({ hasText: '已收录到「本地数据库」' }),
+    ).toBeVisible();
+    await expect(
+      noteDrawer.locator('.drawer-meta').getByRole('button', { name: '本地数据库', exact: true }),
+    ).toBeVisible();
+
+    // 再打开：刚收录的归纳要带「已收录」标记且不可重复选择。
+    await noteDrawer.getByRole('button', { name: '＋ 收录到归纳' }).click();
+    await expect(page.getByRole('dialog', { name: '收录到归纳' })).toBeVisible();
+    await expect(
+      page
+        .getByRole('dialog', { name: '收录到归纳' })
+        .getByRole('checkbox', { name: '本地数据库' }),
+    ).toBeDisabled();
+    await expect(
+      page.getByRole('dialog', { name: '收录到归纳' }).getByText('已收录'),
+    ).toBeVisible();
+
+    // 抽屉里直接新建归纳：新建后自动勾上，和已有选择一起提交。
     await page
-      .getByRole('button', { name: /随手记/ })
-      .first()
+      .getByRole('dialog', { name: '收录到归纳' })
+      .getByRole('button', { name: '＋ 新建归纳' })
       .click();
-    await expect(page.getByRole('heading', { name: '随手记', exact: true })).toBeVisible();
-    // 等切页过渡结束再点卡片，否则会点在正在离场的旧页面上。
-    await expect(page.locator('.page-enter-active')).toHaveCount(0);
-    // 列表按时间倒序，这里要打开被收录的那一条（样例一），不是最新的那条。
-    await page.locator('.card').filter({ hasText: '归纳验收样例一' }).click();
-    const drawer = page.getByRole('dialog', { name: '手记详情' });
-    await expect(drawer).toBeVisible();
+    const newTopicDialog = page.getByRole('dialog', { name: '新建归纳' });
+    await expect(newTopicDialog).toBeVisible();
+    await newTopicDialog.getByRole('textbox', { name: '标题', exact: true }).fill('归档与检索');
+    await newTopicDialog.getByRole('button', { name: '创建', exact: true }).click();
+    await expect(newTopicDialog).toHaveCount(0);
+    await expect(page.getByRole('dialog', { name: '收录到归纳' })).toBeVisible();
+    await expect(
+      page
+        .getByRole('dialog', { name: '收录到归纳' })
+        .getByRole('checkbox', { name: '归档与检索' }),
+    ).toBeChecked();
+    await expect(page.getByText('已选 1 个')).toBeVisible();
+    await page
+      .getByRole('dialog', { name: '收录到归纳' })
+      .getByRole('button', { name: '收录', exact: true })
+      .click();
+    await expect(
+      page.locator('.toast').filter({ hasText: '已收录到「归档与检索」' }),
+    ).toBeVisible();
+    await expect(
+      noteDrawer.locator('.drawer-meta').getByRole('button', { name: '归档与检索', exact: true }),
+    ).toBeVisible();
+    await page.screenshot({
+      path: 'test-results/topics-collect-from-note.png',
+      animations: 'disabled',
+    });
+    await noteDrawer.getByRole('button', { name: /^关闭/ }).click();
+    await expect(noteDrawer).toHaveCount(0);
+
+    // 抽屉反查：手记应显示所属的两个归纳。
+    noteDrawer = await openNoteDrawer('归纳验收样例一：事务回滚');
+    const drawer = noteDrawer;
     const collectSection = drawer.locator('.drawer-meta');
     await expect(
       collectSection.getByRole('button', { name: '本地数据库', exact: true }),
@@ -189,7 +259,7 @@ test('真实桌面：新建归纳、多重收录、抽屉反查与移出', async
       .getByRole('button', { name: /知识归纳/ })
       .first()
       .click();
-    await expect(reopened.locator('.card.collection')).toHaveCount(2);
+    await expect(reopened.locator('.card.collection')).toHaveCount(3);
     await expect(reopened.getByText('1 条手记').first()).toBeVisible();
     expect(errors).toEqual([]);
   } finally {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { Note, NoteCategory } from '../../domain/note';
+import type { TopicCreate } from '../../domain/topic';
 import AppIcon from './components/AppIcon.vue';
 import HomePage from './pages/HomePage.vue';
 import NotesPage from './pages/NotesPage.vue';
@@ -42,6 +43,8 @@ const topicState = useTopics(libraryApi);
 const threadState = useThreads(libraryApi);
 // 回收站现场同时负责删除确认：删除一律先展示影响面，再执行。
 const trashState = useTrash(libraryApi);
+/** 归纳操作（收录、移出、新建）失败的原因：交给手记抽屉就地显示，不留静默失败。 */
+const topicError = ref('');
 const createTopicSignal = ref(0);
 const openTopicSignal = ref<{ id: string; nonce: number } | null>(null);
 /** 每次进入归纳模块都递增：与原型一致，点模块导航即回到列表，不停留在某条详情。 */
@@ -164,6 +167,7 @@ async function save() {
 async function openNote(id: string) {
   const note = notes.value.find((item) => item.id === id);
   if (!note || busy.value) return;
+  topicError.value = '';
   if (!(await library.openNote(note))) banner.value = '当前手记尚未保存，请重试后再打开其他手记。';
 }
 
@@ -194,13 +198,31 @@ async function createTopic() {
 
 /** 收录与移出的结果提示统一在这里给出：撤销只针对当次操作，其他收录不受影响。 */
 async function collectIntoTopics(topicId: string, noteIds: string[]) {
-  if (!(await topicState.addNotes(topicId, noteIds))) return;
+  if (!(await topicState.addNotes(topicId, noteIds))) {
+    topicError.value = topicState.error.value || '收录没有完成，请重试。';
+    return;
+  }
+  topicError.value = '';
   const name = topicState.topics.value.find((topic) => topic.id === topicId)?.title;
   notify({ message: name ? `已收录到「${name}」` : '已收录到归纳' });
 }
 
+/** 手记抽屉里的「新建归纳」：创建成功后交给抽屉去勾选，收录仍由用户点「收录」提交。 */
+async function createTopicForNote(input: TopicCreate) {
+  const created = await topicState.create(input);
+  if (!created) {
+    return { ok: false as const, message: topicState.error.value || '归纳没有创建成功，请重试。' };
+  }
+  announce(`已创建归纳「${created.title}」`);
+  return { ok: true as const, topic: created };
+}
+
 async function removeNoteFromTopic(topicId: string, noteId: string) {
-  if (!(await topicState.removeNote(topicId, noteId))) return;
+  if (!(await topicState.removeNote(topicId, noteId))) {
+    topicError.value = topicState.error.value || '移出没有完成，请重试。';
+    return;
+  }
+  topicError.value = '';
   notify({
     message: '已从归纳移出，手记仍在随手记',
     undo: () => {
@@ -632,6 +654,8 @@ onBeforeUnmount(() => {
       :topics="topicState.topics.value"
       :notes="notes"
       :references="threadState.references.value"
+      :topic-error="topicError"
+      :create-topic="createTopicForNote"
       @change="library.changeNote"
       @close="closeDrawer"
       @retry="library.flushNote"
