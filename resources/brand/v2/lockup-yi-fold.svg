@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="760" height="220" viewBox="0 0 760 220" role="img">
-  <title>Memocraft 横排锁定</title>
-  <g transform="translate(20 38) scale(0.234)">
-  <path d="M 160 96 H 352 A 64 64 0 0 1 416 160 V 320 L 320 416 H 160 A 64 64 0 0 1 96 352 V 160 A 64 64 0 0 1 160 96 Z" fill="#2f4a66"/>
-  <path d="M 320 416 L 416 320 L 290 290 Z" fill="#8fb0d6"/>
-  </g>
-  <text x="180" y="142" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif" font-size="72" font-weight="700" letter-spacing="-1.5" fill="#25242a">Memocraft</text>
-  <text x="182" y="188" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif" font-size="30" letter-spacing="6" fill="#6d6b73">创忆工坊</text>
-</svg>

@@ -11,6 +11,16 @@ import { coordinateWindowClose } from './close-window';
 import { AppError } from '../shared/errors';
 import { mkdirSync } from 'node:fs';
 
+// 从终端启动后若终端被关闭，写 stdout/stderr 会失败（EIO/EPIPE）。Electron 内部也会写日志
+// （例如向已销毁的界面发消息时 console.error），没有监听就会变成"主进程未捕获异常"弹窗。
+// 日志写不出去不影响数据与界面，只忽略这两类写入错误，其他错误照常抛出。
+for (const stream of [process.stdout, process.stderr]) {
+  stream.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code === 'EIO' || error.code === 'EPIPE') return;
+    throw error;
+  });
+}
+
 // 自定义协议必须在应用就绪前登记权限，否则界面无法加载本地图片。
 registerImageScheme();
 
