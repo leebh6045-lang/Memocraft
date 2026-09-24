@@ -10,6 +10,7 @@ import {
 import AppIcon from '../components/AppIcon.vue';
 import { formatFullTime, formatTime } from '../format-time';
 import CategorySelector from '../components/CategorySelector.vue';
+import TagPickerDrawer from '../components/TagPickerDrawer.vue';
 
 const props = defineProps<{
   draft: NoteDraft;
@@ -33,8 +34,9 @@ const emit = defineEmits<{
 }>();
 const body = ref<HTMLTextAreaElement | null>(null);
 const shaking = ref(false);
+/** 标签在右侧抽屉里点选：补充区只留已选胶囊与入口，永远一行。 */
+const tagOpen = ref(false);
 let shakeTimer: ReturnType<typeof setTimeout> | undefined;
-const tagsText = ref(props.draft.tags.join(', '));
 watch(
   () => props.error,
   (message) => {
@@ -51,26 +53,19 @@ watch(
 watch(
   () => props.draft.id,
   async () => {
-    tagsText.value = props.draft.tags.join(', ');
+    tagOpen.value = false;
     await nextTick();
     body.value?.focus();
   },
 );
 onMounted(() => body.value?.focus({ preventScroll: true }));
 onBeforeUnmount(() => clearTimeout(shakeTimer));
-function updateTags(event: Event) {
-  if (!(event.target instanceof HTMLInputElement)) return;
-  tagsText.value = event.target.value;
-  emit('change', {
-    tags: [
-      ...new Set(
-        tagsText.value
-          .split(/[,，]/)
-          .map((tag) => tag.trim())
-          .filter(Boolean),
-      ),
-    ],
-  });
+function setTags(tags: string[]): void {
+  emit('change', { tags });
+}
+
+function removeTag(tag: string): void {
+  emit('change', { tags: props.draft.tags.filter((item) => item !== tag) });
 }
 </script>
 
@@ -105,13 +100,25 @@ function updateTags(event: Event) {
                 placeholder="留空则取正文第一行"
                 @input="emit('change', { title: ($event.target as HTMLInputElement).value })"
             /></label>
-            <label class="field"
-              >标签（可选）<input
-                :value="tagsText"
-                :disabled="busy"
-                placeholder="逗号分隔，如 sqlite, 备份"
-                @input="updateTags"
-            /></label>
+            <div class="field">
+              <span>标签（可选）</span>
+              <div class="chip-row">
+                <span v-for="tag in draft.tags" :key="tag" class="chip on"
+                  >{{ tag
+                  }}<button
+                    class="chip-x"
+                    :disabled="busy"
+                    :aria-label="`移除标签：${tag}`"
+                    @click="removeTag(tag)"
+                  >
+                    ×
+                  </button></span
+                >
+                <button class="inline-add" :disabled="busy" @click="tagOpen = true">
+                  ＋ 选择标签
+                </button>
+              </div>
+            </div>
             <div class="field wide">
               <span>归纳与事务关联</span
               ><span class="faint">先保存手记，再到手记详情里收录到归纳或关联事务。</span>
@@ -185,5 +192,14 @@ function updateTags(event: Event) {
         </button>
       </TransitionGroup>
     </div>
+
+    <TagPickerDrawer
+      :open="tagOpen"
+      :hint="draft.title.trim() || '新手记'"
+      :model-value="draft.tags"
+      :busy="busy"
+      @update:model-value="setTags"
+      @close="tagOpen = false"
+    />
   </section>
 </template>

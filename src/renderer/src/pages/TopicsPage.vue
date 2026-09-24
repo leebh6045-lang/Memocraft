@@ -59,10 +59,6 @@ const activeNotes = computed(() => {
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function topicsOfNote(noteId: string): string[] {
-  return topics.value.filter((topic) => topic.noteIds.includes(noteId)).map((topic) => topic.title);
-}
-
 /** 列表到详情使用共享元素过渡；浏览器不支持或用户要求减少动态时直接切换。 */
 function showDetail(topicId: string): void {
   const swap = () => {
@@ -290,11 +286,7 @@ function writeInTopic(): void {
       </div>
       <div v-else class="grid">
         <div v-for="note in activeNotes" :key="note.id" class="topic-note">
-          <NoteCard
-            :note="note"
-            :topics="topicsOfNote(note.id)"
-            @open="emit('open-note', note.id)"
-          />
+          <NoteCard :note="note" @open="emit('open-note', note.id)" />
           <button
             class="card-remove"
             :disabled="props.busy"

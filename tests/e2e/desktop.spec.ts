@@ -43,7 +43,14 @@ test('真实桌面：草稿重启、四分类、保存、搜索、抽屉编辑�
     await expect(page.getByRole('radio', { name: '待办', exact: true })).toBeChecked();
     await page.getByRole('button', { name: '补充', exact: true }).click();
     await page.getByRole('textbox', { name: '标题（可选）', exact: true }).fill('SQLite 证书记录');
-    await page.getByRole('textbox', { name: '标签（可选）', exact: true }).fill('SQLite, 测试');
+    // 标签改为在右侧抽屉里点选：这里走自定义标签分支。
+    await page.getByRole('button', { name: '＋ 选择标签' }).click();
+    const tagDrawer = page.getByRole('dialog', { name: '选择标签' });
+    await expect(tagDrawer).toBeVisible();
+    await tagDrawer.getByRole('textbox', { name: '自定义标签' }).fill('SQLite, 测试');
+    await tagDrawer.getByRole('textbox', { name: '自定义标签' }).press('Enter');
+    await tagDrawer.getByRole('button', { name: '完成' }).click();
+    await expect(tagDrawer).toHaveCount(0);
     await page.getByRole('button', { name: '保存手记', exact: true }).click();
     await expect(page.getByRole('textbox', { name: '手记正文', exact: true })).toHaveValue('');
     await expect(page.getByRole('radio', { name: '收获', exact: true })).toBeChecked();

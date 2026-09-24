@@ -10,7 +10,7 @@ const props = defineProps<{
   filter: NoteCategory | 'all';
   tag: string;
   highlighted: string | null;
-  /** 归纳列表：卡片脚注据此显示「收录于 …」，没有收录就不显示。 */
+  /** 归纳列表：卡片据此显示「已收录」胶囊，没有收录就不显示任何标记。 */
   topics: TopicSummary[];
 }>();
 const emit = defineEmits<{
@@ -81,7 +81,7 @@ const topicsOfNote = (noteId: string): string[] =>
         :key="note.id"
         :note="note"
         :highlighted="highlighted === note.id"
-        :topics="topicsOfNote(note.id)"
+        :collected="topicsOfNote(note.id)"
         @open="emit('open', $event)"
       />
     </TransitionGroup>
