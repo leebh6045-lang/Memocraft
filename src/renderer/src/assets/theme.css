@@ -1318,6 +1318,22 @@ mark {
   box-shadow: var(--shadow-lg);
   transition: transform var(--dur-3) var(--ease-out);
 }
+/*
+ * 视觉上顶到窗口上沿：面板本体仍从标题栏下方开始（布局与拖动判定都不变），
+ * 上面这 34px 用一层与面板同色的盖子填住——否则会露出被遮罩压暗的窗口背景，
+ * 看起来像抽屉被切掉一口。盖子不吃指针事件，并随面板一起做进出场平移。
+ */
+.drawer::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  right: 0;
+  bottom: 100%;
+  height: var(--bar-h);
+  background: inherit;
+  border-left: 1px solid var(--border);
+  pointer-events: none;
+}
 .drawer-head {
   display: flex;
   align-items: center;
