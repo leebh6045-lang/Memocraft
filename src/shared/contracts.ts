@@ -118,12 +118,7 @@ export interface MemocraftApi {
   closeReady(): void;
   closeCancelled(): void;
   platform: 'mac' | 'windows' | 'linux';
-  /** 应用版本（读自打包配置）；界面只展示它，不手写版本号。 */
-  version: string;
 }
-
-/** 版本号随启动参数从主进程传给沙箱 preload。 */
-export const APP_VERSION_ARGUMENT = '--memocraft-version';
 
 /** 图片通过自定义协议展示；该协议只接受图片 ID，不接受任意路径。 */
 export const IMAGE_PROTOCOL = 'memocraft-image';

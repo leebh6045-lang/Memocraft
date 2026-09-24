@@ -393,7 +393,7 @@ kbd {
 .nav-tools .nav-item {
   font-size: 13px;
 }
-.app-version {
+.beta {
   position: fixed;
   left: 16px;
   bottom: 14px;
@@ -405,16 +405,16 @@ kbd {
   color: var(--faint);
   pointer-events: none;
 }
-.app-version::before {
+.beta::before {
   content: '';
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: var(--c-todo);
   box-shadow: 0 0 0 0 var(--c-todo);
-  animation: version-pulse 2.6s ease-out infinite;
+  animation: beta-pulse 2.6s ease-out infinite;
 }
-@keyframes version-pulse {
+@keyframes beta-pulse {
   0% {
     box-shadow: 0 0 0 0 rgba(184, 134, 43, 0.45);
   }
@@ -1879,7 +1879,7 @@ mark {
     margin-left: auto;
     flex-direction: row;
   }
-  .app-version {
+  .beta {
     left: auto;
     right: 14px;
   }
@@ -1911,7 +1911,7 @@ html.theme-switching * {
   align-items: center;
   gap: 6px;
 }
-.corner .app-version {
+.corner .beta {
   position: static;
 }
 .corner-btn {

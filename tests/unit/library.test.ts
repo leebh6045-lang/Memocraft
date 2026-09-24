@@ -48,7 +48,6 @@ function unavailableEntry(): Result<EntrySummary> {
 /** 每个写请求由测试显式应答，确保能观察真实请求之间继续输入的行为。 */
 class ControlledApi implements MemocraftApi {
   readonly platform = 'mac' as const;
-  readonly version = '0.0.0-test';
   readonly draftWrites: Pending<NoteDraft, NoteDraft>[] = [];
   readonly commits: Pending<NoteDraft, Note>[] = [];
   readonly noteWrites: Pending<NoteEdit, Note>[] = [];

@@ -24,12 +24,10 @@ const emptyTrash: Result<TrashItem[]> = { ok: true, value: [] };
 
 /**
  * 普通浏览器不伪造保存能力：所有数据方法返回同一条明确失败。
- * 版本号同样不编造：拿不到就留空，界面据此不显示版本。
  * 图集与归纳的读取返回空集合，使界面在未接入桌面能力时也能正常渲染空状态，
  * 写入仍然失败，不会出现「看起来保存成功」的假象。
  */
 export const disconnectedApi: MemocraftApi = {
-  version: '',
   load: unavailable,
   saveDraft: unavailable,
   commitDraft: unavailable,

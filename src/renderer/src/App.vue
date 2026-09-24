@@ -101,8 +101,6 @@ const saveFeedback = ref(false);
 const main = ref<HTMLElement | null>(null);
 const busy = computed(() => closing.value || submitting.value || navigating.value);
 const shortcut = api?.platform === 'mac' ? '⌘' : 'Ctrl';
-/** 左下角显示应用自己的版本；拿不到版本时不显示，不编造。 */
-const appVersion = api?.version ?? '';
 const activeIndex = computed(() => pages.findIndex((item) => item.id === page.value));
 const scrollPositions = new Map<Page, number>();
 let saveFeedbackTimer: ReturnType<typeof setTimeout> | undefined;
@@ -604,7 +602,6 @@ onBeforeUnmount(() => {
           v-else-if="page === 'settings'"
           key="settings"
           :theme="themePreference"
-          :version="appVersion"
           :bridge="libraryApi"
           :busy="busy"
           @update:theme="setThemePreference"
@@ -616,7 +613,7 @@ onBeforeUnmount(() => {
     </main>
   </div>
   <div class="corner">
-    <span v-if="appVersion" class="app-version">v{{ appVersion }}</span>
+    <span class="beta">内测中</span>
     <button
       type="button"
       class="corner-btn"

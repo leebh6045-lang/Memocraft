@@ -28,9 +28,6 @@ test('真实桌面：草稿重启、四分类、保存、搜索、抽屉编辑�
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await expect(page.getByRole('heading', { name: '新手记', exact: true })).toBeVisible();
-    // 左下角显示应用自己的版本号：只校验形状，数字随打包配置走。
-    const appVersion = await page.locator('.app-version').innerText();
-    expect(appVersion).toMatch(/^v\d+\.\d+\.\d+$/);
     await page
       .getByRole('textbox', { name: '手记正文', exact: true })
       .fill('尚未提交的中文草稿 📝\n保留第二行');
@@ -113,14 +110,6 @@ test('真实桌面：草稿重启、四分类、保存、搜索、抽屉编辑�
     await app.evaluate(({ BrowserWindow }) => {
       BrowserWindow.getAllWindows()[0]?.setSize(1280, 900);
     });
-    // 设置页「关于」显示的版本与左下角同源，不是另写一个数字。
-    await page.getByRole('button', { name: /设置（/ }).click();
-    await expect(page.getByRole('heading', { name: '设置', exact: true })).toBeVisible();
-    await expect(page.locator('.kv')).toContainText(appVersion);
-    await page.screenshot({ path: 'test-results/desktop-about.png', animations: 'disabled' });
-    await page.getByRole('button', { name: /首页/ }).first().click();
-    await expect(page.getByRole('heading', { name: '新手记', exact: true })).toBeVisible();
-
     await page.getByRole('button', { name: '深色', exact: true }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await page.screenshot({ path: 'test-results/desktop-dark.png', animations: 'disabled' });

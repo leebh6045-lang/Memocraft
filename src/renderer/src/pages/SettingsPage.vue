@@ -6,13 +6,7 @@ import AppDialog from '../components/AppDialog.vue';
 import AppIcon from '../components/AppIcon.vue';
 import type { ThemePreference } from '../theme';
 
-const props = defineProps<{
-  theme: ThemePreference;
-  bridge: MemocraftApi;
-  busy: boolean;
-  /** 应用版本，由外壳从 preload 拿到后传入；设置页只负责显示。 */
-  version: string;
-}>();
+const props = defineProps<{ theme: ThemePreference; bridge: MemocraftApi; busy: boolean }>();
 const emit = defineEmits<{
   'update:theme': [ThemePreference];
   notify: [payload: { message: string }];
@@ -208,10 +202,10 @@ async function exportData(): Promise<void> {
 
     <section class="panel">
       <h2>关于</h2>
-      <p class="panel-sub">版本号来自应用自身（打包配置），界面不手写版本。</p>
+      <p class="panel-sub">开发阶段应用固定显示「内测中」，不展示虚构的发布版本。</p>
       <dl class="kv">
-        <dt>版本</dt>
-        <dd>{{ props.version ? `v${props.version}` : '未知' }}</dd>
+        <dt>发行标识</dt>
+        <dd>内测中</dd>
         <dt>数据库</dt>
         <dd>SQLite（应用内置驱动）· 结构化数据唯一主存储</dd>
         <dt>图片</dt>
