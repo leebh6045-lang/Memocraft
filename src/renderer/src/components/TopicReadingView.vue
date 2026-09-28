@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { categoryLabel, noteExcerpt, noteTitle, type Note } from '../../../domain/note';
-import { imageLabel, type NoteImageIndex } from '../../../domain/note-image';
+import { imageLabel, type NoteImageIndex, type NoteImageSummary } from '../../../domain/note-image';
 import type { TopicSummary } from '../../../domain/topic';
 import { formatFullTime, formatTime } from '../format-time';
 import { renderMarkdown } from '../markdown';
 import { imageUrl } from '../../../shared/contracts';
 import { contentScroller } from '../scroll';
+import ImageViewer from './ImageViewer.vue';
 
 /**
  * 连读：把一个归纳里收录的手记连成一篇文档，每条手记是一个小节。
@@ -30,6 +31,8 @@ const emit = defineEmits<{
 
 const root = ref<HTMLElement | null>(null);
 const activeId = ref('');
+/** 正在放大的图片：连同它所在小节的整组图片一起交给放大层，可翻上一张 / 下一张。 */
+const viewing = ref<{ images: NoteImageSummary[]; startId: string } | null>(null);
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /** 小节内容一次算好：模板里不再重复渲染 Markdown，也不反复过滤归纳关系。 */
@@ -136,17 +139,25 @@ watch(
         <div v-if="section.bodyHtml" class="doc-body md" v-html="section.bodyHtml" />
         <!-- eslint-enable vue/no-v-html -->
         <div v-if="section.images.length" class="doc-imgs">
-          <img
+          <!-- 点图放大：与抽屉图集共用同一层，可翻上一张 / 下一张，Esc 只关这一层。 -->
+          <button
             v-for="(image, index) in section.images"
             :key="image.id"
-            :src="imageUrl(image)"
-            :alt="imageLabel(image, index)"
-            :title="imageLabel(image, index)"
-            loading="lazy"
-            decoding="async"
-            width="120"
-            height="84"
-          />
+            type="button"
+            class="doc-thumb"
+            :aria-label="`放大查看 ${imageLabel(image, index)}`"
+            @click="viewing = { images: section.images, startId: image.id }"
+          >
+            <img
+              :src="imageUrl(image)"
+              :alt="imageLabel(image, index)"
+              :title="imageLabel(image, index)"
+              loading="lazy"
+              decoding="async"
+              width="120"
+              height="84"
+            />
+          </button>
         </div>
         <div class="doc-actions">
           <button type="button" class="btn-quiet" @click="emit('open', section.note.id)">
@@ -172,6 +183,13 @@ watch(
         <span>{{ section.title }}</span>
       </a>
     </nav>
+
+    <ImageViewer
+      v-if="viewing"
+      :images="viewing.images"
+      :start-id="viewing.startId"
+      @close="viewing = null"
+    />
   </div>
 </template>
 
@@ -240,13 +258,26 @@ watch(
   gap: 8px;
   margin: 12px 0 0 23px;
 }
-.doc-imgs img {
-  width: 120px;
-  height: 84px;
-  object-fit: cover;
+/* 缩略图本身是按钮：点它放大查看，因此去掉按钮默认样式并给出悬停反馈。 */
+.doc-thumb {
+  padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-s);
   background: var(--surface-2);
+  overflow: hidden;
+  transition:
+    border-color var(--dur-1) ease,
+    transform var(--dur-1) ease;
+}
+.doc-thumb:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+.doc-imgs img {
+  display: block;
+  width: 120px;
+  height: 84px;
+  object-fit: cover;
 }
 /* 小节动作只在悬停或键盘聚焦时出现，平时让位给正文。 */
 .doc-actions {

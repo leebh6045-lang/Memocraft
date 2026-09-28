@@ -39,7 +39,10 @@ const library = useLibrary(libraryApi);
 // 列表缩略图的图片摘要：随手记集合补齐，读取失败只提示一次，列表与正文不受影响。
 const noteImageIndex = useNoteImageIndex(libraryApi, (message) => announce(message));
 // 图集现场独立于正文编辑现场：改名字或删除图片不会触发手记版本冲突。
-const noteImages = useNoteImages(libraryApi);
+// 图集变化后刷新摘要缓存，否则阅读流与连读会一直用加图之前的空结果。
+const noteImages = useNoteImages(libraryApi, (noteId) => void noteImageIndex.refresh(noteId));
+// 首页草稿的图集现场：它没有列表缩略图，因此不需要刷新摘要缓存。
+const draftImages = useNoteImages(libraryApi);
 // 归纳列表由渲染端持有：收录数量、抽屉里的所属归纳与选择器状态都从这一份数据推导。
 const topicState = useTopics(libraryApi);
 // 事务列表与当前时间线同样由渲染端持有；手记的反查结果单独按需读取。
@@ -290,6 +293,8 @@ async function confirmRemoval() {
 
 /** 恢复或回收站恢复都会改变数据，因此把手记、归纳、事务与回收站一起重新读取。 */
 async function refreshAfterRestore() {
+  // 整个库被替换：摘要缓存先清空，随后的手记重读才会真正重新问一遍。
+  noteImageIndex.reset();
   await Promise.all([library.reload(), topicState.load(), threadState.load(), trashState.load()]);
 }
 
@@ -548,6 +553,9 @@ onBeforeUnmount(() => {
           :saved="saveFeedback"
           :shortcut="shortcut"
           :focused="focused"
+          :draft-images="draftImages"
+          :ensure-draft-stored="library.ensureDraftStored"
+          @notify="notify"
           @change="library.changeDraft"
           @save="save"
           @retry="retrySave"

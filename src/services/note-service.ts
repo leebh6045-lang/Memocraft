@@ -15,7 +15,7 @@ import {
   validateImageId,
   validateImageRename,
   validateNoteEdit,
-  validateNoteId,
+  validateImageOwner,
   validateNoteIds,
   validateSearch,
   validateTopicCreate,
@@ -65,19 +65,22 @@ export async function executeStoreRequest(
       return store.load();
     case 'saveDraft':
       return store.saveDraft(validateDraft(request.payload));
-    case 'commitDraft':
-      return store.commitDraft(validateDraft(request.payload, true));
+    case 'commitDraft': {
+      const draft = validateDraft(request.payload, true);
+      // 草稿附图与创建手记、清理草稿在同一个事务里完成归属。
+      return store.commitDraft(draft, (noteId) => images.claimDraftImages(draft.id, noteId));
+    }
     case 'updateNote':
       return store.updateNote(validateNoteEdit(request.payload));
     case 'search':
       return search.search(validateSearch(request.payload));
     case 'loadImages':
-      return images.list(validateNoteId(request.payload));
+      return images.list(validateImageOwner(request.payload));
     case 'loadImageIndex':
       return images.listSummaries(validateNoteIds(request.payload));
     case 'addImages': {
-      const { noteId, images: inputs } = validateAddImages(request.payload);
-      return images.add(noteId, inputs);
+      const { owner, images: inputs } = validateAddImages(request.payload);
+      return images.add(owner, inputs);
     }
     case 'renameImage': {
       const { imageId, displayName } = validateImageRename(request.payload);

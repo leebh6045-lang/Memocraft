@@ -3,8 +3,10 @@ import { randomUUID } from 'node:crypto';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import type { DatabaseSync, SQLOutputValue } from 'node:sqlite';
 import {
+  draftOwner,
   imageExtension,
   isImageMimeType,
+  noteOwner,
   readImageSize,
   MAX_IMAGE_BYTES,
   MAX_NOTE_IMAGE_BYTES,
@@ -12,6 +14,7 @@ import {
   sniffImageMimeType,
   type ImageInput,
   type ImageMimeType,
+  type ImageOwner,
   type NoteImage,
   type NoteImageIndex,
   type NoteImageList,
@@ -64,14 +67,15 @@ export class NoteImageStore {
     this.attachmentsDirectory = join(dataDirectory, ATTACHMENTS_DIRECTORY);
   }
 
-  list(noteId: string): NoteImageList {
-    // 手记在回收站时其图片不可见；图片自身的软删除单独判断。
-    if (!this.findNote(noteId)) return { images: [], totalBytes: 0 };
+  /** 图集按归属读取：手记在回收站时其图片不可见；草稿图片只看自身的软删除。 */
+  list(owner: ImageOwner): NoteImageList {
+    if (owner.kind === 'note' && !this.findNote(owner.id)) return { images: [], totalBytes: 0 };
+    const column = owner.kind === 'note' ? 'note_id' : 'draft_id';
     const rows = this.database
       .prepare(
-        `SELECT * FROM note_images WHERE note_id = ? AND ${IMAGE_SELF_VISIBLE} ORDER BY position, id`,
+        `SELECT * FROM note_images WHERE ${column} = ? AND ${IMAGE_SELF_VISIBLE} ORDER BY position, id`,
       )
-      .all(noteId);
+      .all(owner.id);
     const images = rows.map((row) => this.imageFromRow(row));
     return { images, totalBytes: images.reduce((total, image) => total + image.byteSize, 0) };
   }
@@ -79,6 +83,7 @@ export class NoteImageStore {
   /**
    * 列表缩略图用：一次取回一批手记的图片摘要，避免为每条手记单独发起请求。
    * 可见性与 list 一致（图片与所属手记都未删除），只取展示需要的列，不读文件。
+   * 草稿附图不参与：它还没有对应的手记，也不会出现在任何列表里。
    */
   listSummaries(noteIds: string[]): NoteImageIndex {
     if (noteIds.length === 0) return {};
@@ -110,8 +115,12 @@ export class NoteImageStore {
     return index;
   }
 
-  add(noteId: string, inputs: ImageInput[]): NoteImageList {
-    if (!this.findNote(noteId)) throw new AppError('NOT_FOUND', '手记不存在或已进入回收站。');
+  add(owner: ImageOwner, inputs: ImageInput[]): NoteImageList {
+    if (owner.kind === 'note' && !this.findNote(owner.id))
+      throw new AppError('NOT_FOUND', '手记不存在或已进入回收站。');
+    // 草稿图片由外键保证归属存在：草稿行还没落盘时明确拒绝，由调用方先保存草稿。
+    if (owner.kind === 'draft' && !this.findDraft(owner.id))
+      throw new AppError('NOT_FOUND', '草稿还没有保存，请稍后再添加图片。');
     const prepared = inputs.map((input) => this.prepareImage(input));
     const addedBytes = prepared.reduce((total, image) => total + image.bytes.byteLength, 0);
     mkdirSync(this.attachmentsDirectory, { recursive: true });
@@ -128,10 +137,11 @@ export class NoteImageStore {
       if (error instanceof AppError) throw error;
       throw new AppError('STORAGE', '图片未能写入数据目录，请检查可用空间后重试。');
     }
+    const column = owner.kind === 'note' ? 'note_id' : 'draft_id';
     try {
       transaction(this.database, () => {
         // 数量与体积上限在事务内按最新状态判断，避免与并发写入互相覆盖。
-        const current = this.list(noteId);
+        const current = this.list(owner);
         if (current.images.length + prepared.length > MAX_NOTE_IMAGE_COUNT) {
           throw new AppError('VALIDATION', `每条手记最多保存 ${MAX_NOTE_IMAGE_COUNT} 张图片。`);
         }
@@ -143,19 +153,20 @@ export class NoteImageStore {
         }
         // 位置必须接在已有最大位置之后：软删除的图片仍占用位置，不能复用它的序号。
         const last = this.database
-          .prepare('SELECT max(position) AS last FROM note_images WHERE note_id = ?')
-          .get(noteId)?.last;
+          .prepare(`SELECT max(position) AS last FROM note_images WHERE ${column} = ?`)
+          .get(owner.id)?.last;
         let position = typeof last === 'number' && Number.isSafeInteger(last) ? last + 1 : 0;
         for (const image of prepared) {
           this.database
             .prepare(
               `INSERT INTO note_images
-                (id, note_id, relative_path, mime_type, byte_size, width, height, display_name, original_name, position, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?)`,
+                (id, note_id, draft_id, relative_path, mime_type, byte_size, width, height, display_name, original_name, position, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?)`,
             )
             .run(
               image.id,
-              noteId,
+              owner.kind === 'note' ? owner.id : null,
+              owner.kind === 'draft' ? owner.id : null,
               image.relativePath,
               image.mimeType,
               image.bytes.byteLength,
@@ -173,7 +184,18 @@ export class NoteImageStore {
       for (const path of written) tryRemoveFile(path);
       throw error;
     }
-    return this.list(noteId);
+    return this.list(owner);
+  }
+
+  /**
+   * 保存手记时把草稿附图转成这条手记的图片。
+   * 由 NoteStore 在自己的事务里调用，因此这里不再开事务；
+   * 顺序固定为「先插入手记、再认领图片、最后删草稿行」，外键保证不会留下孤儿。
+   */
+  claimDraftImages(draftId: string, noteId: string): void {
+    this.database
+      .prepare('UPDATE note_images SET note_id = ?, draft_id = NULL WHERE draft_id = ?')
+      .run(noteId, draftId);
   }
 
   rename(imageId: string, displayName: string): NoteImageList {
@@ -183,7 +205,7 @@ export class NoteImageStore {
         .prepare('UPDATE note_images SET display_name = ? WHERE id = ?')
         .run(displayName.trim(), imageId);
     });
-    return this.list(image.noteId);
+    return this.list(ownerOf(image));
   }
 
   remove(imageId: string): NoteImageList {
@@ -194,13 +216,15 @@ export class NoteImageStore {
         .prepare(`UPDATE note_images SET deleted_at = ? WHERE id = ? AND ${IMAGE_SELF_VISIBLE}`)
         .run(new Date().toISOString(), imageId);
     });
-    return this.list(image.noteId);
+    return this.list(ownerOf(image));
   }
 
-  /** 自定义协议取图：每次请求都按 ID、软删除、所属手记和路径归属重新校验。 */
+  /** 自定义协议取图：每次请求都按 ID、软删除、归属与路径归属重新校验。 */
   readBytes(imageId: string): { image: NoteImage; bytes: Buffer } {
     const image = this.requireImage(imageId);
-    if (!this.findNote(image.noteId)) throw new AppError('NOT_FOUND', '图片所属手记已进入回收站。');
+    // 草稿附图还没有所属手记；已保存的图片仍要求手记可见（手记在回收站时不可读）。
+    if (image.noteId !== null && !this.findNote(image.noteId))
+      throw new AppError('NOT_FOUND', '图片所属手记已进入回收站。');
     const path = this.filePath(image.relativePath);
     if (!existsSync(path))
       throw new AppError('NOT_FOUND', '图片文件不在数据目录中，可能已被移动。');
@@ -272,6 +296,14 @@ export class NoteImageStore {
     return row !== undefined;
   }
 
+  /** 草稿行由首页自动保存写入；这里只判断归属是否存在，供添加图片前给出明确原因。 */
+  private findDraft(draftId: string): boolean {
+    const row = this.database
+      .prepare('SELECT 1 AS present FROM note_drafts WHERE id = ?')
+      .get(draftId);
+    return row !== undefined;
+  }
+
   private requireImage(imageId: string): NoteImage {
     const row = this.database
       .prepare(`SELECT * FROM note_images WHERE id = ? AND ${IMAGE_SELF_VISIBLE}`)
@@ -284,9 +316,14 @@ export class NoteImageStore {
     const mimeType = row.mime_type;
     if (!isImageMimeType(mimeType))
       throw new AppError('STORAGE', '图片类型字段异常，原数据已保留。');
+    const noteId = row.note_id;
+    const draftId = row.draft_id;
+    if (typeof noteId !== 'string' && typeof draftId !== 'string')
+      throw new AppError('STORAGE', '图片记录缺少归属，原数据已保留。');
     return {
       id: stringField(row, 'id'),
-      noteId: stringField(row, 'note_id'),
+      noteId: typeof noteId === 'string' ? noteId : null,
+      draftId: typeof draftId === 'string' ? draftId : null,
       relativePath: stringField(row, 'relative_path'),
       mimeType,
       byteSize: numberField(row, 'byte_size'),
@@ -298,4 +335,11 @@ export class NoteImageStore {
       createdAt: stringField(row, 'created_at'),
     };
   }
+}
+
+/** 从图片自身还原它的归属：改名、移出之后要把对应归属的图集返回给界面。 */
+function ownerOf(image: NoteImage): ImageOwner {
+  if (image.noteId) return noteOwner(image.noteId);
+  if (image.draftId) return draftOwner(image.draftId);
+  throw new AppError('STORAGE', '图片记录缺少归属，原数据已保留。');
 }

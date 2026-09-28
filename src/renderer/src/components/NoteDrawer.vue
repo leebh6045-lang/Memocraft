@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, toValue, watch } from 'vue';
 import { noteTitle, type Note, type NoteContent } from '../../../domain/note';
+import { noteOwner } from '../../../domain/note-image';
 import type { MemocraftApi } from '../../../shared/contracts';
 import type { NoteReference } from '../../../domain/thread';
 import type { TopicCreate, TopicSummary } from '../../../domain/topic';
@@ -89,6 +90,8 @@ const preview = ref(false);
 const tagsText = ref(props.note.tags.join(', '));
 const imageError = ref('');
 const imageBusy = ref(false);
+/** 手记详情的图集归属：这条已保存的手记。 */
+const owner = computed(() => noteOwner(props.note.id));
 // 图集状态经计算属性摊平为普通值：模板只绑定基本类型，避免 ref 与 props 嵌套难以核对。
 const galleryImages = computed(() => toValue(props.images.images));
 const galleryLoading = computed(() => toValue(props.images.loading));
@@ -103,7 +106,7 @@ watch(
     preview.value = false;
     imageError.value = '';
     // 抽屉挂载即读取图集；换手记时重新读取。
-    void props.images.load(noteId);
+    void props.images.load(noteOwner(noteId));
   },
   { immediate: true },
 );
@@ -113,7 +116,7 @@ async function addImages() {
   imageBusy.value = true;
   imageError.value = '';
   try {
-    const saved = await props.images.addFromDialog(props.note.id);
+    const saved = await props.images.addFromDialog(owner.value);
     if (!saved) imageError.value = toValue(props.images.error);
   } finally {
     imageBusy.value = false;
@@ -125,7 +128,7 @@ async function pasteImage(image: { bytes: Uint8Array; originalName: string }) {
   imageBusy.value = true;
   imageError.value = '';
   try {
-    const saved = await props.images.addFromClipboard(props.note.id, image);
+    const saved = await props.images.addFromClipboard(owner.value, image);
     if (!saved) imageError.value = toValue(props.images.error);
   } finally {
     imageBusy.value = false;
@@ -133,12 +136,12 @@ async function pasteImage(image: { bytes: Uint8Array; originalName: string }) {
 }
 
 async function renameImage(imageId: string, displayName: string) {
-  if (!(await props.images.rename(props.note.id, imageId, displayName)))
+  if (!(await props.images.rename(owner.value, imageId, displayName)))
     imageError.value = toValue(props.images.error);
 }
 
 async function removeImage(imageId: string) {
-  if (!(await props.images.remove(props.note.id, imageId)))
+  if (!(await props.images.remove(owner.value, imageId)))
     imageError.value = toValue(props.images.error);
 }
 
@@ -279,7 +282,6 @@ onBeforeUnmount(() => document.removeEventListener('paste', handlePaste));
           :busy="galleryBusy"
           :error="galleryError"
           :status="galleryStatus"
-          :disabled="busy"
           @add="addImages"
           @rename="renameImage"
           @remove="removeImage"

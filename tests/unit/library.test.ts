@@ -76,7 +76,7 @@ class ControlledApi implements MemocraftApi {
   async loadImageIndex(): Promise<Result<NoteImageIndex>> {
     return { ok: true, value: {} };
   }
-  async addImagesFromDialog(): Promise<Result<NoteImageList>> {
+  async addImagesFromDialog(): Promise<Result<NoteImageList | null>> {
     return { ok: true, value: { images: [], totalBytes: 0 } };
   }
   async addImageFromClipboard(): Promise<Result<NoteImageList>> {

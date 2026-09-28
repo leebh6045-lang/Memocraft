@@ -6,10 +6,13 @@ import {
   type NoteEdit,
 } from '../domain/note';
 import {
+  draftOwner,
+  noteOwner,
   MAX_IMAGE_BYTES,
   MAX_IMAGE_INDEX_NOTES,
   MAX_IMAGE_NAME_LENGTH,
   type ImageInput,
+  type ImageOwner,
 } from '../domain/note-image';
 import { TRASH_KINDS, type TrashKind, type TrashRef } from '../domain/trash';
 import {
@@ -143,12 +146,27 @@ function imageInput(input: unknown): ImageInput {
   return { bytes, originalName: (value.originalName ?? '').slice(0, 300) };
 }
 
-export function validateAddImages(input: unknown): { noteId: string; images: ImageInput[] } {
+export function validateAddImages(input: unknown): { owner: ImageOwner; images: ImageInput[] } {
   const value = record(input);
   if (!Array.isArray(value.images) || value.images.length === 0) invalid('请选择要添加的图片。');
   if (value.images.length > MAX_IMAGE_COUNT_PER_REQUEST)
     invalid(`一次最多添加 ${MAX_IMAGE_COUNT_PER_REQUEST} 张图片。`);
-  return { noteId: identifier(value.noteId), images: value.images.map(imageInput) };
+  return { owner: validateImageOwner(value.owner), images: value.images.map(imageInput) };
+}
+
+/**
+ * 图片归属：已保存的手记，或首页尚未保存的草稿。
+ * 两者都是 UUID，但提示文案不同，避免给出误导性的报错。
+ */
+export function validateImageOwner(input: unknown): ImageOwner {
+  const value = record(input);
+  if (value.kind === 'note') return noteOwner(identifier(value.id));
+  if (value.kind === 'draft') {
+    if (typeof value.id !== 'string' || !UUID.test(value.id))
+      invalid('草稿标识不正确，请重新打开应用后重试。');
+    return draftOwner(value.id);
+  }
+  invalid('图片归属不正确，请重新打开页面后重试。');
 }
 
 export function validateImageId(input: unknown): string {

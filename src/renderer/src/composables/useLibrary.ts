@@ -156,6 +156,41 @@ export function useLibrary(api: MemocraftApi) {
     }
   }
 
+  /**
+   * 确保草稿行已经落盘：图片等附属内容要归属草稿，写入之前这一行必须存在。
+   * 与自动保存不同，内容没变时也要写一次——调用方要的是「归属存在」这个事实。
+   */
+  async function ensureDraftStored(): Promise<boolean> {
+    clearTimeout(draftTimer);
+    if (pendingCommit) {
+      draftError.value = '上次保存结果尚未确认，当前内容仍保留；请稍后再添加图片。';
+      return false;
+    }
+    if (draftFlight) return draftFlight;
+    draftFlight = storeDraftOnce();
+    try {
+      return await draftFlight;
+    } finally {
+      draftFlight = null;
+    }
+  }
+
+  async function storeDraftOnce(): Promise<boolean> {
+    try {
+      const snapshot = draftCopy(draft.value);
+      const saved = unwrap(await api.saveDraft(snapshot));
+      // 服务端返回别的版本说明草稿已被改写：不能把当前内容当成已保存。
+      if (saved.revision !== snapshot.revision)
+        throw new AppError('CONFLICT', '草稿已有其他修改，请重新打开后核对。');
+      savedDraftRevision = Math.max(savedDraftRevision, saved.revision);
+      draftError.value = '';
+      return true;
+    } catch (error) {
+      draftError.value = errorMessage(error);
+      return false;
+    }
+  }
+
   async function commit(): Promise<Note | null> {
     if (submission.value) return submission.value;
     if (!draft.value.body.trim() && !pendingCommit) {
@@ -328,6 +363,7 @@ export function useLibrary(api: MemocraftApi) {
     initialize,
     changeDraft,
     flushDraft,
+    ensureDraftStored,
     commit,
     openNote,
     changeNote,

@@ -1,6 +1,12 @@
 import type { LibrarySnapshot, Note, NoteDraft, NoteEdit } from '../domain/note';
 import type { SearchResult } from '../domain/search';
-import type { ImageInput, NoteImage, NoteImageIndex, NoteImageList } from '../domain/note-image';
+import type {
+  ImageInput,
+  ImageOwner,
+  NoteImage,
+  NoteImageIndex,
+  NoteImageList,
+} from '../domain/note-image';
 import type { TopicCreate, TopicEdit, TopicSummary } from '../domain/topic';
 import type { RemovalImpact, TrashItem, TrashKind } from '../domain/trash';
 import type { BackupSummary, ExportSummary, StagedRestore } from '../domain/library-data';
@@ -66,13 +72,14 @@ export interface MemocraftApi {
   updateNote(edit: NoteEdit): Promise<Result<Note>>;
   /** 全对象搜索：覆盖手记、归纳、事务与动态；草稿与回收站内容不参与。 */
   search(query: string): Promise<Result<SearchResult>>;
-  loadImages(noteId: string): Promise<Result<NoteImageList>>;
+  /** 图集按归属读取：已保存的手记，或首页尚未保存的草稿。 */
+  loadImages(owner: ImageOwner): Promise<Result<NoteImageList>>;
   /** 列表缩略图：按手记 ID 批量取图片摘要，未收录附图或已删除的手记不出现在结果里。 */
   loadImageIndex(noteIds: string[]): Promise<Result<NoteImageIndex>>;
-  /** 主进程打开系统文件选择并复制所选图片；用户取消时返回空列表。 */
-  addImagesFromDialog(noteId: string): Promise<Result<NoteImageList>>;
+  /** 主进程打开系统文件选择并复制所选图片；用户取消时返回 null，界面据此不提示成功。 */
+  addImagesFromDialog(owner: ImageOwner): Promise<Result<NoteImageList | null>>;
   /** 粘贴剪贴板位图；字节随本次调用传入，渲染端不接触文件路径。 */
-  addImageFromClipboard(noteId: string, image: ImageInput): Promise<Result<NoteImageList>>;
+  addImageFromClipboard(owner: ImageOwner, image: ImageInput): Promise<Result<NoteImageList>>;
   renameImage(imageId: string, displayName: string): Promise<Result<NoteImageList>>;
   deleteImage(imageId: string): Promise<Result<NoteImageList>>;
   /** 归纳列表：每个归纳带上当前收录的有效手记 ID，计数与反查共用这一份数据。 */

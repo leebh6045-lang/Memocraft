@@ -9,14 +9,16 @@ import {
 import { GIF_4X2, JPEG_6X7, NOT_AN_IMAGE, PNG_2X3, WEBP_5X4 } from '../fixtures/images';
 import {
   validateAddImages,
-  validateImageRename,
   validateImageName,
+  validateImageOwner,
+  validateImageRename,
 } from '../../src/services/validation';
 
 function image(overrides: Partial<NoteImage> = {}): NoteImage {
   return {
     id: '11111111-1111-4111-8111-111111111111',
     noteId: '22222222-2222-4222-8222-222222222222',
+    draftId: null,
     relativePath: 'attachments/11111111-1111-4111-8111-111111111111.png',
     mimeType: 'image/png',
     byteSize: 100,
@@ -72,13 +74,30 @@ describe('图片显示名称', () => {
 
 describe('图片入口校验', () => {
   const noteId = '22222222-2222-4222-8222-222222222222';
+  const draftId = '33333333-3333-4333-8333-333333333333';
+  const note = { kind: 'note', id: noteId };
+
+  it('接受手记与草稿两种归属，草稿图片先归草稿再随保存转成手记的', () => {
+    expect(validateImageOwner(note)).toEqual({ kind: 'note', id: noteId });
+    expect(validateImageOwner({ kind: 'draft', id: draftId })).toEqual({
+      kind: 'draft',
+      id: draftId,
+    });
+    expect(
+      validateAddImages({ owner: { kind: 'draft', id: draftId }, images: [{ bytes: PNG_2X3 }] })
+        .owner,
+    ).toEqual({ kind: 'draft', id: draftId });
+    expect(() => validateImageOwner({ kind: 'draft', id: '../escape' })).toThrow('草稿标识');
+    expect(() => validateImageOwner({ kind: 'folder', id: noteId })).toThrow('归属不正确');
+    expect(() => validateImageOwner(noteId)).toThrow();
+  });
 
   it('接受 Uint8Array 与普通数字数组两种传输形态', () => {
-    expect(validateAddImages({ noteId, images: [{ bytes: PNG_2X3 }] }).images[0]?.bytes).toEqual(
-      PNG_2X3,
-    );
+    expect(
+      validateAddImages({ owner: note, images: [{ bytes: PNG_2X3 }] }).images[0]?.bytes,
+    ).toEqual(PNG_2X3);
     const asArray = validateAddImages({
-      noteId,
+      owner: note,
       images: [{ bytes: Array.from(PNG_2X3), originalName: 'a.png' }],
     });
     expect(asArray.images[0]?.bytes).toEqual(PNG_2X3);
@@ -86,15 +105,15 @@ describe('图片入口校验', () => {
   });
 
   it('空内容、非法标识与非数组载荷被拒绝', () => {
-    expect(() => validateAddImages({ noteId, images: [] })).toThrow('请选择');
-    expect(() => validateAddImages({ noteId, images: [{ bytes: new Uint8Array() }] })).toThrow(
+    expect(() => validateAddImages({ owner: note, images: [] })).toThrow('请选择');
+    expect(() => validateAddImages({ owner: note, images: [{ bytes: new Uint8Array() }] })).toThrow(
       '为空',
     );
     expect(() =>
-      validateAddImages({ noteId: '../escape', images: [{ bytes: PNG_2X3 }] }),
+      validateAddImages({ owner: { kind: 'note', id: '../escape' }, images: [{ bytes: PNG_2X3 }] }),
     ).toThrow();
-    expect(() => validateAddImages({ noteId, images: PNG_2X3 })).toThrow();
-    expect(() => validateAddImages({ noteId, images: [{ bytes: [0, 999] }] })).toThrow();
+    expect(() => validateAddImages({ owner: note, images: PNG_2X3 })).toThrow();
+    expect(() => validateAddImages({ owner: note, images: [{ bytes: [0, 999] }] })).toThrow();
   });
 
   it('重命名载荷要求图片 ID 与名称同时合法', () => {

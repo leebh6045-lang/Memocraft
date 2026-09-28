@@ -112,6 +112,25 @@ describe('连读视图', () => {
     expect(image.attributes('loading')).toBe('lazy');
   });
 
+  it('点小节的附图打开放大层，关闭后放大层消失', async () => {
+    const view = mountView();
+    await flushPromises();
+    // 缩略图是可聚焦按钮；放大层挂在 body 上，因此从 document 查找。
+    const thumb = view.find('.doc-thumb');
+    expect(thumb.attributes('aria-label')).toBe('放大查看 lint 配置');
+    await thumb.trigger('click');
+    await flushPromises();
+    const viewer = document.body.querySelector('.viewer');
+    expect(viewer?.getAttribute('role')).toBe('dialog');
+    expect(viewer?.querySelector('.viewer-image')?.getAttribute('src')).toBe(
+      `memocraft-image://image/${UUID_IMAGE}`,
+    );
+
+    document.body.querySelector<HTMLButtonElement>('.viewer-close')?.click();
+    await flushPromises();
+    expect(document.body.querySelector('.viewer')).toBeNull();
+  });
+
   it('小节动作发出打开与移出，移出只带手记 ID', async () => {
     const view = mountView();
     await flushPromises();

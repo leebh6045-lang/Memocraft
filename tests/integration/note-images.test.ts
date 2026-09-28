@@ -10,6 +10,7 @@ import { MAX_NOTE_IMAGE_COUNT } from '../../src/domain/note-image';
 import { NoteStore } from '../../src/storage/note-store';
 import { SCHEMA_VERSION } from '../../src/storage/schema';
 import { NoteImageStore } from '../../src/storage/note-image-store';
+import { draftOwner, noteOwner } from '../../src/domain/note-image';
 import { backupLibrary, restoreDatabaseBackup } from '../../src/storage/backup';
 import { GIF_4X2, JPEG_6X7, NOT_AN_IMAGE, PNG_2X3, WEBP_5X4 } from '../fixtures/images';
 
@@ -64,7 +65,7 @@ describe('真实 SQLite 附图闭环', () => {
   it('添加图片同时写入文件与元数据，尺寸与类型由内容判定', () => {
     const { store, images } = open();
     const note = commit(store);
-    const list = images.add(note.id, [
+    const list = images.add(noteOwner(note.id), [
       input(PNG_2X3, '设计草图.png'),
       input(JPEG_6X7, 'photo.jpg'),
       input(GIF_4X2, 'anim.gif'),
@@ -99,21 +100,23 @@ describe('真实 SQLite 附图闭环', () => {
     );
     // 重新打开后仍然可读，说明元数据真正落库。
     const reopened = open();
-    expect(reopened.images.list(note.id)).toEqual(list);
+    expect(reopened.images.list(noteOwner(note.id))).toEqual(list);
   });
 
   it('非图片内容被拒绝，且不留下文件或记录', () => {
     const { store, images } = open();
     const note = commit(store);
-    expect(() => images.add(note.id, [input(NOT_AN_IMAGE, 'fake.png')])).toThrow('只支持');
-    expect(images.list(note.id).images).toEqual([]);
+    expect(() => images.add(noteOwner(note.id), [input(NOT_AN_IMAGE, 'fake.png')])).toThrow(
+      '只支持',
+    );
+    expect(images.list(noteOwner(note.id)).images).toEqual([]);
     expect(imageFiles()).toEqual([]);
   });
 
   it('未保存的 note_id 无法写入图片，外键不会产生孤儿记录', () => {
     const { store, images } = open();
     const note = commit(store);
-    expect(() => images.add(randomUUID(), [input(PNG_2X3)])).toThrow('手记不存在');
+    expect(() => images.add(noteOwner(randomUUID()), [input(PNG_2X3)])).toThrow('手记不存在');
     const database = new DatabaseSync(join(dataDirectory, 'memocraft.sqlite'));
     try {
       expect(() =>
@@ -127,13 +130,13 @@ describe('真实 SQLite 附图闭环', () => {
     } finally {
       database.close();
     }
-    expect(images.list(note.id).images).toEqual([]);
+    expect(images.list(noteOwner(note.id)).images).toEqual([]);
   });
 
   it('命名只改显示名称，删除为软删除：文件保留但不再列出', () => {
     const { store, images } = open();
     const note = commit(store);
-    const added = images.add(note.id, [input(PNG_2X3, 'original.png')]);
+    const added = images.add(noteOwner(note.id), [input(PNG_2X3, 'original.png')]);
     const image = added.images[0];
     if (!image) throw new Error('测试前置数据缺失');
     const renamed = images.rename(image.id, '  证书截图  ');
@@ -149,7 +152,7 @@ describe('真实 SQLite 附图闭环', () => {
     expect(() => images.readBytes(image.id)).toThrow('已删除');
     expect(() => images.rename(image.id, 'again')).toThrow('已删除');
     // 软删除的图片仍占用位置序号，新图片接着往后排，不与其冲突。
-    const again = images.add(note.id, [input(JPEG_6X7)]);
+    const again = images.add(noteOwner(note.id), [input(JPEG_6X7)]);
     expect(again.images.map((item) => item.position)).toEqual([1]);
     expect(again.images.map((item) => item.mimeType)).toEqual(['image/jpeg']);
   });
@@ -157,7 +160,7 @@ describe('真实 SQLite 附图闭环', () => {
   it('手记进入回收站后其图片不再可见也不可读取', () => {
     const { store, images } = open();
     const note = commit(store);
-    const image = images.add(note.id, [input(PNG_2X3)]).images[0];
+    const image = images.add(noteOwner(note.id), [input(PNG_2X3)]).images[0];
     if (!image) throw new Error('测试前置数据缺失');
     const database = new DatabaseSync(join(dataDirectory, 'memocraft.sqlite'));
     try {
@@ -168,7 +171,7 @@ describe('真实 SQLite 附图闭环', () => {
     } finally {
       database.close();
     }
-    expect(images.list(note.id)).toEqual({ images: [], totalBytes: 0 });
+    expect(images.list(noteOwner(note.id))).toEqual({ images: [], totalBytes: 0 });
     expect(() => images.readBytes(image.id)).toThrow('回收站');
     // 文件仍然保留，软删除不丢内容。
     expect(imageFiles()).toHaveLength(1);
@@ -179,12 +182,12 @@ describe('真实 SQLite 附图闭环', () => {
     const first = commit(store);
     const second = commit(store);
     const third = commit(store);
-    const added = images.add(first.id, [
+    const added = images.add(noteOwner(first.id), [
       input(PNG_2X3, 'first.png'),
       input(JPEG_6X7, 'second.jpg'),
     ]);
     images.rename(added.images[1]?.id ?? '', '第二张');
-    images.add(second.id, [input(GIF_4X2, 'anim.gif')]);
+    images.add(noteOwner(second.id), [input(GIF_4X2, 'anim.gif')]);
 
     const index = images.listSummaries([first.id, second.id, third.id]);
     // 没有附图的手记不出现在结果里，界面据此不渲染缩略图区。
@@ -217,12 +220,105 @@ describe('真实 SQLite 附图闭环', () => {
     expect(images.listSummaries([second.id])).toEqual({});
   });
 
+  it('草稿附图：先归属草稿，保存手记的同一事务里转成这条手记的图片', () => {
+    const { store, images } = open();
+    const pending = draft();
+    store.saveDraft(pending);
+    const added = images.add(draftOwner(pending.id), [
+      input(PNG_2X3, '草稿图.png'),
+      input(JPEG_6X7, '第二张.jpg'),
+    ]);
+    expect(added.images.map((image) => [image.noteId, image.draftId])).toEqual([
+      [null, pending.id],
+      [null, pending.id],
+    ]);
+    // 草稿附图不参与列表缩略图：它还没有对应的手记。
+    expect(images.listSummaries([pending.id])).toEqual({});
+
+    const note = store.commitDraft(pending, (noteId) =>
+      images.claimDraftImages(pending.id, noteId),
+    );
+    // 稳定 ID 让草稿直接变成这条手记，图片同时换了归属。
+    expect(note.id).toBe(pending.id);
+    expect(images.list(noteOwner(note.id)).images.map((image) => image.originalName)).toEqual([
+      '草稿图.png',
+      '第二张.jpg',
+    ]);
+    expect(images.list(draftOwner(pending.id))).toEqual({ images: [], totalBytes: 0 });
+    // 归属换过来之后，列表缩略图的摘要才看得到它。
+    expect(images.listSummaries([note.id])[note.id]).toHaveLength(2);
+    // 文件仍在附件目录里，只是换了归属记录。
+    expect(imageFiles()).toHaveLength(2);
+  });
+
+  it('草稿尚未落盘时拒绝添加图片；草稿附图可改名与移出', () => {
+    const { store, images } = open();
+    const missing = draft();
+    expect(() => images.add(draftOwner(missing.id), [input(PNG_2X3)])).toThrow('草稿还没有保存');
+
+    store.saveDraft(missing);
+    const image = images.add(draftOwner(missing.id), [input(PNG_2X3, '草稿.png')]).images[0];
+    if (!image) throw new Error('测试前置数据缺失');
+    expect(images.rename(image.id, '  起个名字  ').images[0]?.displayName).toBe('起个名字');
+    // 改名与移出都返回草稿归属的图集，而不是手记的。
+    expect(images.remove(image.id).images).toEqual([]);
+    expect(() => images.readBytes(image.id)).toThrow('已删除');
+    // 软删除的文件保留，草稿记录不再可读。
+    expect(imageFiles()).toHaveLength(1);
+  });
+
+  it('旧库升级到 005：已有图片行原样保留，并补上可空的草稿归属', () => {
+    // 先用只到 004 的迁移目录造一个旧库，并在里面写一张图片。
+    const legacyMigrations = join(temporaryDirectory, 'migrations-004');
+    mkdirSync(legacyMigrations);
+    for (const name of [
+      '001_notes.sql',
+      '002_note_images.sql',
+      '003_topics.sql',
+      '004_threads.sql',
+    ]) {
+      writeFileSync(join(legacyMigrations, name), readFileSync(join(migrationsDirectory, name)));
+    }
+    const legacy = new NoteStore({
+      dataDirectory,
+      migrationsDirectory: legacyMigrations,
+      expectedSchemaVersion: 4,
+    });
+    const note = legacy.commitDraft(draft());
+    // 旧库还没有 draft_id 列：按旧结构直接写入，才代表真实的待升级数据。
+    const legacyImageId = randomUUID();
+    const legacyRelative = `attachments/${legacyImageId}.png`;
+    mkdirSync(join(dataDirectory, 'attachments'), { recursive: true });
+    writeFileSync(join(dataDirectory, legacyRelative), PNG_2X3);
+    legacy
+      .connection()
+      .prepare(
+        `INSERT INTO note_images
+           (id, note_id, relative_path, mime_type, byte_size, width, height, display_name, original_name, position, created_at)
+         VALUES (?, ?, ?, 'image/png', ?, 2, 3, '', '旧库图片.png', 0, ?)`,
+      )
+      .run(legacyImageId, note.id, legacyRelative, PNG_2X3.byteLength, new Date().toISOString());
+    legacy.close();
+
+    // 换回当前迁移目录打开：005 重建表，旧行必须完整保留。
+    const { store, images } = open();
+    const migrated = images.list(noteOwner(note.id)).images;
+    expect(migrated.map((image) => image.originalName)).toEqual(['旧库图片.png']);
+    expect(migrated[0]?.noteId).toBe(note.id);
+    expect(migrated[0]?.draftId).toBeNull();
+    // 升级后的库同时支持草稿归属。
+    const pending = draft();
+    store.saveDraft(pending);
+    expect(images.add(draftOwner(pending.id), [input(GIF_4X2)]).images).toHaveLength(1);
+    expect(imageFiles()).toHaveLength(2);
+  });
+
   it('单条手记的图片数量上限在写入前生效', () => {
     const { store, images } = open();
     const note = commit(store);
     const batch = Array.from({ length: MAX_NOTE_IMAGE_COUNT }, () => input(PNG_2X3));
-    expect(images.add(note.id, batch).images).toHaveLength(MAX_NOTE_IMAGE_COUNT);
-    expect(() => images.add(note.id, [input(PNG_2X3)])).toThrow('最多保存');
+    expect(images.add(noteOwner(note.id), batch).images).toHaveLength(MAX_NOTE_IMAGE_COUNT);
+    expect(() => images.add(noteOwner(note.id), [input(PNG_2X3)])).toThrow('最多保存');
     // 被拒绝的一批不会留下多余文件。
     expect(imageFiles()).toHaveLength(MAX_NOTE_IMAGE_COUNT);
   });
@@ -254,9 +350,9 @@ describe('图片随备份与恢复一起搬运', () => {
   it('目录包恢复后数据库与附件逐项一致', async () => {
     const { store, images } = open();
     const note = commit(store);
-    images.add(note.id, [input(PNG_2X3, '第一张.png'), input(JPEG_6X7, '第二张.jpg')]);
+    images.add(noteOwner(note.id), [input(PNG_2X3, '第一张.png'), input(JPEG_6X7, '第二张.jpg')]);
     const other = commit(store);
-    images.add(other.id, [input(GIF_4X2)]);
+    images.add(noteOwner(other.id), [input(GIF_4X2)]);
     const backup = join(temporaryDirectory, 'library-backup');
     await backupLibrary(store, images, backup);
     const manifest = JSON.parse(readFileSync(join(backup, 'backup.json'), 'utf8'));
@@ -279,8 +375,8 @@ describe('图片随备份与恢复一起搬运', () => {
     try {
       const restoredImages = new NoteImageStore(restoredStore.connection(), destination);
       expect(restoredStore.load()).toEqual(store.load());
-      expect(restoredImages.list(note.id)).toEqual(images.list(note.id));
-      expect(restoredImages.list(other.id)).toEqual(images.list(other.id));
+      expect(restoredImages.list(noteOwner(note.id))).toEqual(images.list(noteOwner(note.id)));
+      expect(restoredImages.list(noteOwner(other.id))).toEqual(images.list(noteOwner(other.id)));
       expect(imageFiles(destination)).toEqual(imageFiles());
     } finally {
       restoredStore.close();
@@ -290,7 +386,7 @@ describe('图片随备份与恢复一起搬运', () => {
   it('附件被改动或缺失时拒绝恢复，目标目录保持为空', async () => {
     const { store, images } = open();
     const note = commit(store);
-    images.add(note.id, [input(PNG_2X3)]);
+    images.add(noteOwner(note.id), [input(PNG_2X3)]);
     const backup = join(temporaryDirectory, 'tampered-backup');
     await backupLibrary(store, images, backup);
     const manifest = JSON.parse(readFileSync(join(backup, 'backup.json'), 'utf8'));
@@ -312,7 +408,7 @@ describe('图片随备份与恢复一起搬运', () => {
   it('清单登记逃逸路径时拒绝恢复，不写到目标目录之外', async () => {
     const { store, images } = open();
     const note = commit(store);
-    images.add(note.id, [input(PNG_2X3)]);
+    images.add(noteOwner(note.id), [input(PNG_2X3)]);
     const backup = join(temporaryDirectory, 'escape-backup');
     await backupLibrary(store, images, backup);
     const manifestPath = join(backup, 'backup.json');
@@ -329,7 +425,7 @@ describe('图片随备份与恢复一起搬运', () => {
   it('缺少清单的旧快照仍可恢复为无附件的库', async () => {
     const { store, images } = open();
     const note = commit(store);
-    images.add(note.id, [input(PNG_2X3)]);
+    images.add(noteOwner(note.id), [input(PNG_2X3)]);
     const snapshotDirectory = join(temporaryDirectory, 'legacy');
     mkdirSync(snapshotDirectory);
     const snapshot = join(snapshotDirectory, 'old.sqlite');
@@ -358,7 +454,7 @@ describe('图片随备份与恢复一起搬运', () => {
   it('备份时附件文件缺失会中止，且不产生半套备份目录', async () => {
     const { store, images } = open();
     const note = commit(store);
-    const image = images.add(note.id, [input(PNG_2X3)]).images[0];
+    const image = images.add(noteOwner(note.id), [input(PNG_2X3)]).images[0];
     if (!image) throw new Error('测试前置数据缺失');
     rmSync(join(dataDirectory, image.relativePath), { force: true });
     const backup = join(temporaryDirectory, 'missing-file-backup');

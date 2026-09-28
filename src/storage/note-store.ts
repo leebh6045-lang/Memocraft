@@ -180,11 +180,16 @@ export class NoteStore {
     });
   }
 
-  commitDraft(draft: NoteDraft): Note {
+  /**
+   * 正式提交草稿。
+   * `claimDraftImages` 由服务层传入：草稿期间的附图必须与创建手记、清理草稿在同一个事务里
+   * 归属到这条手记，任一步失败整体回滚，不留「有手记没图」或「图还挂在草稿上」的半套结果。
+   */
+  commitDraft(draft: NoteDraft, claimDraftImages?: (noteId: string) => void): Note {
     validateDraft(draft);
     validateContent(draft, true);
     return transaction(this.database, () => {
-      // 按稳定 ID 查证重复提交；创建、标签关联和草稿清理共用本事务。
+      // 按稳定 ID 查证重复提交；创建、标签关联、附图归属和草稿清理共用本事务。
       const existing = this.findNote(draft.id, true);
       if (existing) return existing;
       const current = this.currentDraft();
@@ -198,6 +203,8 @@ export class NoteStore {
         )
         .run(draft.id, draft.body, draft.title, draft.category, now, now);
       this.replaceTags(draft.id, draft.tags);
+      // 先插入手记，再把草稿附图转过来，最后才删草稿行：外键保证顺序不能颠倒。
+      claimDraftImages?.(draft.id);
       this.database.prepare('DELETE FROM note_drafts WHERE id = ?').run(draft.id);
       return this.requireNote(draft.id);
     });

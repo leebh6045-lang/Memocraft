@@ -58,7 +58,7 @@ describe('系统选图后的主进程读取', () => {
 });
 
 describe('选图对话框的取消与转发', () => {
-  const noteId = '22222222-2222-4222-8222-222222222222';
+  const owner = { kind: 'note', id: '22222222-2222-4222-8222-222222222222' } as const;
 
   function recorder() {
     const requests: StoreRequest[] = [];
@@ -69,15 +69,15 @@ describe('选图对话框的取消与转发', () => {
     return { requests, request };
   }
 
-  it('取消选择时只读取当前列表，不写入任何图片', async () => {
+  it('取消选择时返回 null：没有写入，界面据此不提示成功', async () => {
     const { requests, request } = recorder();
     const result = await handleAddImagesFromDialog(
       async () => ({ canceled: true, filePaths: [] }),
       request,
-      noteId,
+      owner,
     );
-    expect(result).toEqual({ ok: true, value: { images: [], totalBytes: 0 } });
-    expect(requests).toEqual([{ operation: 'loadImages', payload: noteId }]);
+    expect(result).toEqual({ ok: true, value: null });
+    expect(requests).toEqual([]);
   });
 
   it('选择文件后把读到的字节随 addImages 一起提交', async () => {
@@ -85,14 +85,14 @@ describe('选图对话框的取消与转发', () => {
     const result = await handleAddImagesFromDialog(
       async () => ({ canceled: false, filePaths: [fixture('选中的图片.png', PNG_2X3)] }),
       request,
-      noteId,
+      owner,
     );
     expect(result.ok).toBe(true);
     const add = requests[0];
     expect(add?.operation).toBe('addImages');
     if (add?.operation !== 'addImages') throw new Error('未提交添加请求');
-    const payload = add.payload as { noteId: string; images: { bytes: Uint8Array }[] };
-    expect(payload.noteId).toBe(noteId);
+    const payload = add.payload as { owner: unknown; images: { bytes: Uint8Array }[] };
+    expect(payload.owner).toEqual(owner);
     expect(Array.from(payload.images[0]?.bytes ?? [])).toEqual(Array.from(PNG_2X3));
   });
 
@@ -101,7 +101,7 @@ describe('选图对话框的取消与转发', () => {
     const result = await handleAddImagesFromDialog(
       async () => ({ canceled: false, filePaths: [fixture('说明.txt', PNG_2X3)] }),
       request,
-      noteId,
+      owner,
     );
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('本应失败');

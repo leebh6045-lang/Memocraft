@@ -87,4 +87,56 @@ describe('列表缩略图的图片摘要缓存', () => {
     expect(store.index.value[NOTE_A]).toHaveLength(1);
     expect(errors).toHaveLength(1);
   });
+
+  it('图集变化后 refresh 重读这一条：先问到空结果的手记补上图片', async () => {
+    let hasImage = false;
+    const { api, calls } = recorder((): Result<NoteImageIndex> => {
+      if (!hasImage) return { ok: true, value: {} };
+      return { ok: true, value: { [NOTE_A]: [summary('a1')] } };
+    });
+    const store = useNoteImageIndex(api, () => undefined);
+
+    // 第一次问到时这条手记还没有附图，结果为空且被记作「问过」。
+    await store.load([NOTE_A]);
+    expect(store.index.value[NOTE_A]).toBeUndefined();
+
+    // 加图之后必须 refresh，否则列表会一直显示没有图片。
+    hasImage = true;
+    await store.refresh(NOTE_A);
+    expect(calls).toHaveLength(2);
+    expect(store.index.value[NOTE_A]).toHaveLength(1);
+  });
+
+  it('移出图片后 refresh 清掉旧摘要，不会继续显示已经移出的图', async () => {
+    let hasImage = true;
+    const { api } = recorder((): Result<NoteImageIndex> => {
+      if (!hasImage) return { ok: true, value: {} };
+      return { ok: true, value: { [NOTE_A]: [summary('a1')] } };
+    });
+    const store = useNoteImageIndex(api, () => undefined);
+
+    await store.load([NOTE_A]);
+    expect(store.index.value[NOTE_A]).toHaveLength(1);
+
+    hasImage = false;
+    await store.refresh(NOTE_A);
+    expect(store.index.value[NOTE_A]).toBeUndefined();
+  });
+
+  it('reset 之后重新读取全部手记，用于整库被替换的场景', async () => {
+    const { api, calls } = recorder(() => ({ ok: true, value: {} }));
+    const store = useNoteImageIndex(api, () => undefined);
+
+    await store.load([NOTE_A, NOTE_B]);
+    await store.load([NOTE_A, NOTE_B]);
+    expect(calls).toHaveLength(1);
+
+    store.reset();
+    expect(store.index.value).toEqual({});
+    await store.load([NOTE_A, NOTE_B]);
+    expect(calls).toEqual([
+      [NOTE_A, NOTE_B],
+      [NOTE_A, NOTE_B],
+    ]);
+  });
 });

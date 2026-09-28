@@ -526,7 +526,9 @@ textarea::placeholder {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 14px 12px 18px;
+  /* 与正文左右对齐：内容靠外边距定位，分隔线也跟着内缩，不顶到卡片边缘。 */
+  margin: 0 24px;
+  padding: 10px 0 12px;
   border-top: 1px solid var(--border);
   flex-wrap: wrap;
 }
@@ -549,6 +551,14 @@ textarea::placeholder {
     opacity var(--dur-2) ease;
   opacity: 0;
 }
+/* 编辑区里的图片区：与正文左右对齐，分隔线与缩略图都不顶到卡片边缘。 */
+.editor .editor-images {
+  margin: 20px 24px 0;
+}
+/* 上下留白改由这一层提供，避免与组件自身的间距叠加（抽屉里用的是同一段留白）。 */
+.editor .editor-images .gallery {
+  margin-top: 0;
+}
 .editor-extras.open {
   grid-template-rows: 1fr;
   opacity: 1;
@@ -562,7 +572,9 @@ textarea::placeholder {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px 14px;
-  padding: 4px 18px 16px;
+  /* 与正文左右对齐：分隔线同样内缩，编辑区各段共用同一条左基线。 */
+  margin: 0 24px;
+  padding: 4px 0 16px;
   border-top: 1px dashed var(--border);
   min-width: 0;
 }

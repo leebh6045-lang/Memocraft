@@ -49,15 +49,14 @@ export async function readSelectedImages(paths: string[]): Promise<ImageInput[]>
 export async function handleAddImagesFromDialog(
   showOpenDialog: () => Promise<{ canceled: boolean; filePaths: string[] }>,
   request: (request: StoreRequest) => Promise<Result<StoreValue>>,
-  noteId: unknown,
+  owner: unknown,
 ): Promise<Result<StoreValue>> {
   try {
     const selection = await showOpenDialog();
-    // 用户取消不是错误：返回当前列表，界面据此不做任何改动。
-    if (selection.canceled || selection.filePaths.length === 0)
-      return await request({ operation: 'loadImages', payload: noteId });
+    // 用户取消不是错误，也没有任何写入：返回 null，界面据此保持安静。
+    if (selection.canceled || selection.filePaths.length === 0) return { ok: true, value: null };
     const images = await readSelectedImages(selection.filePaths);
-    return await request({ operation: 'addImages', payload: { noteId, images } });
+    return await request({ operation: 'addImages', payload: { owner, images } });
   } catch (error) {
     return failure(error);
   }
@@ -111,11 +110,12 @@ export function registerStoreIpc(
       }
     });
   }
-  ipcMain.handle(CHANNELS.loadImages, async (event, noteId: unknown) => {
+  // 图集载荷是归属对象（手记或草稿），由 services 校验，这里不解析内容。
+  ipcMain.handle(CHANNELS.loadImages, async (event, owner: unknown) => {
     if (!isTrustedSender(event, window, rendererUrl))
       return failure(new AppError('UNAVAILABLE', '请求来源无效。'));
     try {
-      return await store.request({ operation: 'loadImages', payload: noteId });
+      return await store.request({ operation: 'loadImages', payload: owner });
     } catch (error) {
       return failure(error);
     }
@@ -139,7 +139,7 @@ export function registerStoreIpc(
       return failure(error);
     }
   });
-  ipcMain.handle(CHANNELS.addImagesFromDialog, async (event, noteId: unknown) => {
+  ipcMain.handle(CHANNELS.addImagesFromDialog, async (event, owner: unknown) => {
     if (!isTrustedSender(event, window, rendererUrl))
       return failure(new AppError('UNAVAILABLE', '请求来源无效。'));
     return handleAddImagesFromDialog(
@@ -150,7 +150,7 @@ export function registerStoreIpc(
           filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }],
         }),
       (request) => store.request(request),
-      noteId,
+      owner,
     );
   });
   ipcMain.handle(CHANNELS.renameImage, async (event, payload: unknown) => {

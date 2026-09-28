@@ -7,7 +7,10 @@ export const MAX_IMAGE_NAME_LENGTH = 200;
 /** 手记附图；正文不含图片引用，图集以 position 表达加入顺序。 */
 export interface NoteImage {
   id: string;
-  noteId: string;
+  /** 归属手记；还没保存的草稿图片这里为 null。 */
+  noteId: string | null;
+  /** 归属草稿；保存手记时转成 note_id，之后为 null。 */
+  draftId: string | null;
   /** 相对数据目录的路径，固定为 attachments/<id>.<扩展名>。 */
   relativePath: string;
   mimeType: ImageMimeType;
@@ -20,6 +23,15 @@ export interface NoteImage {
   position: number;
   createdAt: string;
 }
+
+/**
+ * 图片的归属对象：已保存的手记，或首页还没保存的草稿。
+ * 草稿附图在保存手记的同一事务里转成这条手记的图片，因此两者用同一套图集操作。
+ */
+export type ImageOwner = { kind: 'note'; id: string } | { kind: 'draft'; id: string };
+
+export const noteOwner = (id: string): ImageOwner => ({ kind: 'note', id });
+export const draftOwner = (id: string): ImageOwner => ({ kind: 'draft', id });
 
 export type ImageMimeType = 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp';
 
@@ -52,6 +64,12 @@ export type NoteImageIndex = Record<string, NoteImageSummary[]>;
 
 /** 一次批量读取的手记条数上限：列表一次显示不了更多，也避免一条 SQL 塞入过多参数。 */
 export const MAX_IMAGE_INDEX_NOTES = 200;
+
+/**
+ * 放大层需要的最小形状：按 ID 取图、按命名规则显示名称。
+ * 图集里的完整图片与列表用的摘要都能直接传进来。
+ */
+export type ViewableImage = Pick<NoteImage, 'id' | 'displayName' | 'originalName'>;
 
 export interface ImageCapacity {
   count: number;
