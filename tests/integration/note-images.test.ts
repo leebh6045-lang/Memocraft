@@ -174,6 +174,49 @@ describe('真实 SQLite 附图闭环', () => {
     expect(imageFiles()).toHaveLength(1);
   });
 
+  it('列表缩略图批量取摘要：只给可见图片，按加入顺序，空列表直接返回空结果', () => {
+    const { store, images } = open();
+    const first = commit(store);
+    const second = commit(store);
+    const third = commit(store);
+    const added = images.add(first.id, [
+      input(PNG_2X3, 'first.png'),
+      input(JPEG_6X7, 'second.jpg'),
+    ]);
+    images.rename(added.images[1]?.id ?? '', '第二张');
+    images.add(second.id, [input(GIF_4X2, 'anim.gif')]);
+
+    const index = images.listSummaries([first.id, second.id, third.id]);
+    // 没有附图的手记不出现在结果里，界面据此不渲染缩略图区。
+    expect(Object.keys(index).sort()).toEqual([first.id, second.id].sort());
+    expect(index[first.id]?.map((image) => image.displayName)).toEqual(['', '第二张']);
+    expect(index[first.id]?.map((image) => image.originalName)).toEqual([
+      'first.png',
+      'second.jpg',
+    ]);
+    expect(index[first.id]?.map((image) => `${image.width}x${image.height}`)).toEqual([
+      '2x3',
+      '6x7',
+    ]);
+    // 摘要不带路径与字节，渲染端仍然拿不到文件位置。
+    expect(Object.keys(index[first.id]?.[0] ?? {}).sort()).toEqual([
+      'displayName',
+      'height',
+      'id',
+      'originalName',
+      'width',
+    ]);
+    expect(images.listSummaries([])).toEqual({});
+
+    // 软删除的图片与进入回收站的手记都不再出现。
+    images.remove(added.images[0]?.id ?? '');
+    expect(images.listSummaries([first.id])[first.id]?.map((item) => item.originalName)).toEqual([
+      'second.jpg',
+    ]);
+    store.remove(second.id);
+    expect(images.listSummaries([second.id])).toEqual({});
+  });
+
   it('单条手记的图片数量上限在写入前生效', () => {
     const { store, images } = open();
     const note = commit(store);

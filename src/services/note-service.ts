@@ -16,6 +16,7 @@ import {
   validateImageRename,
   validateNoteEdit,
   validateNoteId,
+  validateNoteIds,
   validateSearch,
   validateTopicCreate,
   validateTopicEdit,
@@ -72,6 +73,8 @@ export async function executeStoreRequest(
       return search.search(validateSearch(request.payload));
     case 'loadImages':
       return images.list(validateNoteId(request.payload));
+    case 'loadImageIndex':
+      return images.listSummaries(validateNoteIds(request.payload));
     case 'addImages': {
       const { noteId, images: inputs } = validateAddImages(request.payload);
       return images.add(noteId, inputs);

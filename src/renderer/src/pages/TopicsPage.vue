@@ -1,15 +1,32 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import type { Note } from '../../../domain/note';
-import type { TopicCreate } from '../../../domain/topic';
+import { categoryLabel, noteTitle, type Note } from '../../../domain/note';
+import type { NoteImageIndex } from '../../../domain/note-image';
+import type { TopicCreate, TopicSummary } from '../../../domain/topic';
 import NoteCard from '../components/NoteCard.vue';
 import PickerDialog from '../components/PickerDialog.vue';
 import TopicCreateDialog from '../components/TopicCreateDialog.vue';
+import TopicReadingView from '../components/TopicReadingView.vue';
 import { notePickerOptions } from '../picker';
 import { formatTime } from '../format-time';
 import SideDrawer from '../components/SideDrawer.vue';
 import type { TopicState } from '../composables/useTopics';
 import type { TrashState } from '../composables/useTrash';
+import { scrollContentToTop } from '../scroll';
+import {
+  TOPIC_DETAIL_LAYOUTS,
+  TOPIC_DETAIL_ORDERS,
+  TOPICS_LAYOUTS,
+  readTopicDetailLayout,
+  readTopicDetailOrder,
+  readTopicsLayout,
+  writeTopicDetailLayout,
+  writeTopicDetailOrder,
+  writeTopicsLayout,
+  type TopicDetailLayout,
+  type TopicDetailOrder,
+  type TopicsLayout,
+} from '../view-preferences';
 
 const props = defineProps<{
   state: TopicState;
@@ -23,6 +40,8 @@ const props = defineProps<{
   openSignal: { id: string; nonce: number } | null;
   /** 进入模块即回到列表：值变化表示一次新的进入。 */
   navSignal: number;
+  /** 按手记 ID 索引的附图摘要，用于连读小节与卡片里的缩略图。 */
+  imageIndex: NoteImageIndex;
 }>();
 const emit = defineEmits<{
   'open-note': [id: string];
@@ -56,8 +75,74 @@ const activeNotes = computed(() => {
   const byId = new Map(props.notes.map((note) => [note.id, note]));
   return topic.noteIds.map((id) => byId.get(id)).filter((note): note is Note => note !== undefined);
 });
+/** noteIds 本身是手记创建时间倒序；「最早在前」只是把这份顺序反过来，两种呈现共用。 */
+const orderedNotes = computed(() =>
+  detailOrder.value === 'asc' ? [...activeNotes.value].reverse() : activeNotes.value,
+);
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** 列表的排列方式：卡片（默认）或目录；偏好存在本机，只影响列表页，详情页不变。 */
+const layout = ref<TopicsLayout>(readTopicsLayout());
+function chooseLayout(value: TopicsLayout): void {
+  if (layout.value === value) return;
+  layout.value = value;
+  if (!writeTopicsLayout(value)) {
+    emit('notify', { message: '已切换排列方式，但偏好未能保存，重启后会回到卡片。' });
+  }
+}
+
+/**
+ * 详情页的呈现与顺序：连读（默认）把收录的手记连成一篇文档，网格保留卡片与「移出」。
+ * 两项都只影响这一页，选择存在本机，写不进去也照常切换并提示。
+ */
+const detailLayout = ref<TopicDetailLayout>(readTopicDetailLayout());
+const detailOrder = ref<TopicDetailOrder>(readTopicDetailOrder());
+function chooseDetailLayout(value: TopicDetailLayout): void {
+  if (detailLayout.value === value) return;
+  detailLayout.value = value;
+  if (!writeTopicDetailLayout(value)) {
+    emit('notify', { message: '已切换呈现方式，但偏好未能保存，重启后会回到连读。' });
+  }
+}
+function chooseDetailOrder(value: TopicDetailOrder): void {
+  if (detailOrder.value === value) return;
+  detailOrder.value = value;
+  if (!writeTopicDetailOrder(value)) {
+    emit('notify', { message: '已切换顺序，但偏好未能保存，重启后会回到最新在前。' });
+  }
+}
+
+/** 目录每个归纳露出的手记条数；更多的由「查看全部」进入详情。 */
+const TOC_PREVIEW_COUNT = 3;
+const noteMap = computed(() => new Map(props.notes.map((note) => [note.id, note])));
+/** 目录用：归纳收录的有效手记，顺序沿用 noteIds（手记创建时间倒序）。 */
+function notesOf(topic: TopicSummary): Note[] {
+  return topic.noteIds
+    .map((id) => noteMap.value.get(id))
+    .filter((note): note is Note => note !== undefined);
+}
+/** 目录的每一项：归纳本身、最新一条手记与要露出的几条，模板里不再反复计算。 */
+const tocEntries = computed(() =>
+  topics.value.map((topic) => {
+    const notes = notesOf(topic);
+    return { topic, latest: notes[0], preview: notes.slice(0, TOC_PREVIEW_COUNT) };
+  }),
+);
+/** 同一条手记被几个归纳收录：目录里据此标「另见 N」，N 不含当前归纳。 */
+const collectedCount = computed(() => {
+  const counts = new Map<string, number>();
+  for (const topic of topics.value) {
+    for (const id of topic.noteIds) counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return counts;
+});
+function otherTopicTitles(noteId: string, topicId: string): string {
+  return topics.value
+    .filter((topic) => topic.id !== topicId && topic.noteIds.includes(noteId))
+    .map((topic) => topic.title)
+    .join('、');
+}
 
 /** 列表到详情使用共享元素过渡；浏览器不支持或用户要求减少动态时直接切换。 */
 function showDetail(topicId: string): void {
@@ -65,7 +150,8 @@ function showDetail(topicId: string): void {
     activeId.value = topicId;
     view.value = 'detail';
     syncEditingFields();
-    window.scrollTo({ top: 0, behavior: 'instant' });
+    // 主内容区才是滚动容器：进详情要回到顶部，否则会停在列表滚到的位置。
+    scrollContentToTop();
   };
   if (document.startViewTransition && !reducedMotion) document.startViewTransition(swap);
   else swap();
@@ -77,6 +163,7 @@ function backToList(): void {
   activeId.value = null;
   saveStatus.value = '';
   saveError.value = '';
+  scrollContentToTop();
 }
 
 function syncEditingFields(): void {
@@ -229,6 +316,18 @@ function writeInTopic(): void {
           <p class="sub">围绕一个主题收录手记，同一条手记可以出现在多个归纳里。</p>
         </div>
         <div class="actions">
+          <div v-if="topics.length" class="seg seg-sm" role="radiogroup" aria-label="排列方式">
+            <button
+              v-for="option in TOPICS_LAYOUTS"
+              :key="option.value"
+              type="button"
+              role="radio"
+              :aria-checked="layout === option.value"
+              @click="chooseLayout(option.value)"
+            >
+              {{ option.label }}
+            </button>
+          </div>
           <button class="btn-primary" :disabled="props.busy" @click="openCreate">
             <span aria-hidden="true">＋</span> 新建归纳
           </button>
@@ -243,6 +342,60 @@ function writeInTopic(): void {
         还没有归纳。<br />
         <button class="btn-ghost" @click="openCreate">新建第一个归纳</button>
       </div>
+      <!-- 目录：没有卡片框，序号、标题、点线与条数，下面直接露出最新几条手记。 -->
+      <ol v-else-if="layout === 'toc'" class="toc">
+        <li
+          v-for="({ topic, latest, preview }, index) in tocEntries"
+          :key="topic.id"
+          class="toc-item"
+        >
+          <span class="toc-no" aria-hidden="true">{{ String(index + 1).padStart(2, '0') }}</span>
+          <div class="toc-main">
+            <div class="toc-head">
+              <button class="toc-title" @click="showDetail(topic.id)">
+                <span :style="{ viewTransitionName: `topic-${topic.id}` }">{{ topic.title }}</span
+                ><span class="toc-go" aria-hidden="true">→</span>
+              </button>
+              <span class="toc-leader" aria-hidden="true" />
+              <span class="toc-count">{{ topic.noteIds.length }} 条</span>
+            </div>
+            <p v-if="topic.description" class="toc-desc">{{ topic.description }}</p>
+            <p class="toc-meta">
+              {{ formatTime(topic.createdAt) }} 创建<template v-if="latest">
+                · 最新一条 {{ formatTime(latest.createdAt) }}</template
+              >
+            </p>
+            <ul v-if="preview.length" class="toc-notes" :aria-label="`${topic.title} 最新的手记`">
+              <li v-for="note in preview" :key="note.id">
+                <button class="toc-note" @click="emit('open-note', note.id)">
+                  <span class="toc-dot" :class="`cat-${note.category}`" aria-hidden="true" />
+                  <span class="sr-only">{{ categoryLabel(note.category) }}：</span>
+                  <span class="toc-note-title">{{ noteTitle(note) }}</span>
+                  <span
+                    v-if="(collectedCount.get(note.id) ?? 0) > 1"
+                    class="toc-also"
+                    :title="`也收录在：${otherTopicTitles(note.id, topic.id)}`"
+                    >另见 {{ (collectedCount.get(note.id) ?? 0) - 1
+                    }}<span class="sr-only"
+                      >个归纳：{{ otherTopicTitles(note.id, topic.id) }}</span
+                    ></span
+                  >
+                  <span class="toc-fill" />
+                  <time :datetime="note.createdAt">{{ formatTime(note.createdAt) }}</time>
+                </button>
+              </li>
+            </ul>
+            <p v-else class="toc-empty">还没有收录手记。</p>
+            <button
+              v-if="topic.noteIds.length > TOC_PREVIEW_COUNT"
+              class="toc-more"
+              @click="showDetail(topic.id)"
+            >
+              查看全部 {{ topic.noteIds.length }} 条
+            </button>
+          </div>
+        </li>
+      </ol>
       <div v-else class="grid">
         <button
           v-for="(topic, index) in topics"
@@ -284,19 +437,66 @@ function writeInTopic(): void {
         <button class="btn-ghost" @click="pickingFor = activeTopic.id">收录已有手记</button>
         <button class="btn-ghost" @click="writeInTopic">去写一条</button>
       </div>
-      <div v-else class="grid">
-        <div v-for="note in activeNotes" :key="note.id" class="topic-note">
-          <NoteCard :note="note" @open="emit('open-note', note.id)" />
-          <button
-            class="card-remove"
-            :disabled="props.busy"
-            :title="`从这个归纳移出，不删除手记`"
-            @click="removeFromTopic(activeTopic.id, note.id)"
-          >
-            移出
-          </button>
+
+      <template v-else>
+        <!-- 详情页头：说明作为导语只读显示，右侧是顺序与呈现方式，两项都只影响这一页。 -->
+        <div class="doc-bar">
+          <p class="doc-meta">
+            <span v-if="activeTopic.description" class="lede">{{ activeTopic.description }}</span>
+            {{ orderedNotes.length }} 条手记 · 创建于 {{ formatTime(activeTopic.createdAt) }}
+          </p>
+          <div class="toolbar-end">
+            <div class="seg seg-sm" role="radiogroup" aria-label="排列顺序">
+              <button
+                v-for="option in TOPIC_DETAIL_ORDERS"
+                :key="option.value"
+                type="button"
+                role="radio"
+                :aria-checked="detailOrder === option.value"
+                @click="chooseDetailOrder(option.value)"
+              >
+                {{ option.label }}
+              </button>
+            </div>
+            <div class="seg seg-sm" role="radiogroup" aria-label="呈现方式">
+              <button
+                v-for="option in TOPIC_DETAIL_LAYOUTS"
+                :key="option.value"
+                type="button"
+                role="radio"
+                :aria-checked="detailLayout === option.value"
+                @click="chooseDetailLayout(option.value)"
+              >
+                {{ option.label }}
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+
+        <TopicReadingView
+          v-if="detailLayout === 'doc'"
+          :topic-id="activeTopic.id"
+          :notes="orderedNotes"
+          :topics="topics"
+          :image-index="props.imageIndex"
+          @open="emit('open-note', $event)"
+          @remove="removeFromTopic(activeTopic.id, $event)"
+          @open-topic="showDetail"
+        />
+        <div v-else class="grid">
+          <div v-for="note in orderedNotes" :key="note.id" class="topic-note">
+            <NoteCard :note="note" @open="emit('open-note', note.id)" />
+            <button
+              class="card-remove"
+              :disabled="props.busy"
+              :title="`从这个归纳移出，不删除手记`"
+              @click="removeFromTopic(activeTopic.id, note.id)"
+            >
+              移出
+            </button>
+          </div>
+        </div>
+      </template>
     </template>
 
     <TopicCreateDialog
@@ -365,8 +565,41 @@ function writeInTopic(): void {
   gap: 6px;
   align-items: center;
 }
+/* 详情页头：左边是说明导语与条数，右边是顺序与呈现方式。 */
+.doc-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.doc-meta {
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--faint);
+}
+.doc-meta .lede {
+  display: block;
+  font-size: 14px;
+  color: var(--muted);
+}
+.toolbar-end {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .topic-note {
   position: relative;
+} /*
+ * 网格只拉伸这一层 div，卡片本身是 button，默认按内容收缩；
+ * 不撑满格子时，收录的手记一多，同一行的卡片就宽高不齐，「移出」按钮也会浮到卡片外面。
+ */
+.topic-note > .card {
+  width: 100%;
+  height: 100%;
 }
 .card-remove {
   position: absolute;
@@ -390,5 +623,162 @@ function writeInTopic(): void {
 }
 .duplicate-hint {
   color: var(--danger);
+}
+
+/* 目录：只有序号、标题、引导点线和细分隔线，与随手记的卡片网格一眼分开。 */
+.toc {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.toc-item {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  padding: 22px 0 18px;
+  border-top: 1px solid var(--border);
+}
+.toc-item:first-child {
+  padding-top: 4px;
+  border-top: 0;
+}
+.toc-no {
+  font-size: 27px;
+  font-weight: 300;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--faint);
+}
+.toc-main {
+  min-width: 0;
+}
+.toc-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+.toc-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  text-align: left;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+  transition: color var(--dur-1) ease;
+}
+.toc-title:hover {
+  color: var(--accent);
+}
+.toc-go {
+  display: inline-block;
+  margin-left: 6px;
+  font-weight: 400;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition:
+    opacity var(--dur-1) ease,
+    transform var(--dur-2) var(--ease);
+}
+.toc-title:hover .toc-go,
+.toc-title:focus-visible .toc-go {
+  opacity: 1;
+  transform: none;
+}
+.toc-leader {
+  flex: 1 1 24px;
+  min-width: 24px;
+  border-bottom: 1.5px dotted var(--border-strong);
+  transform: translateY(-5px);
+}
+.toc-count {
+  flex: none;
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.toc-desc {
+  margin-top: 3px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.toc-meta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--faint);
+}
+.toc-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.toc-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: calc(100% + 16px);
+  margin: 0 -8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-s);
+  text-align: left;
+  font-size: 13.5px;
+  transition: background-color var(--dur-1) ease;
+}
+.toc-note:hover {
+  background: var(--surface-2);
+}
+.toc-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cat-color, var(--faint));
+}
+.toc-note-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.toc-also {
+  flex: none;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--faint);
+  white-space: nowrap;
+}
+.toc-fill {
+  flex: 1;
+}
+.toc-note time {
+  flex: none;
+  font-size: 12px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+.toc-more {
+  margin-top: 4px;
+  padding: 3px 0;
+  font-size: 12.5px;
+  color: var(--accent);
+}
+.toc-more:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.toc-empty {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--faint);
 }
 </style>

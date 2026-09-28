@@ -9,6 +9,7 @@ const api: MemocraftApi = {
   updateNote: (edit) => ipcRenderer.invoke(CHANNELS.updateNote, edit),
   search: (query) => ipcRenderer.invoke(CHANNELS.search, query),
   loadImages: (noteId) => ipcRenderer.invoke(CHANNELS.loadImages, noteId),
+  loadImageIndex: (noteIds) => ipcRenderer.invoke(CHANNELS.loadImageIndex, noteIds),
   addImagesFromDialog: (noteId) => ipcRenderer.invoke(CHANNELS.addImagesFromDialog, noteId),
   addImageFromClipboard: (noteId, image) =>
     ipcRenderer.invoke(CHANNELS.addImages, { noteId, images: [image] }),

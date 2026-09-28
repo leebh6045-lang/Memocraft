@@ -5,7 +5,12 @@ import {
   type NoteDraft,
   type NoteEdit,
 } from '../domain/note';
-import { MAX_IMAGE_BYTES, MAX_IMAGE_NAME_LENGTH, type ImageInput } from '../domain/note-image';
+import {
+  MAX_IMAGE_BYTES,
+  MAX_IMAGE_INDEX_NOTES,
+  MAX_IMAGE_NAME_LENGTH,
+  type ImageInput,
+} from '../domain/note-image';
 import { TRASH_KINDS, type TrashKind, type TrashRef } from '../domain/trash';
 import {
   ENTRY_BODY_MAX_LENGTH,
@@ -154,6 +159,14 @@ export function validateImageId(input: unknown): string {
 
 export function validateNoteId(input: unknown): string {
   return identifier(input);
+}
+
+/** 列表缩略图的批量读取：允许空列表（没有手记可显示），但拒绝过多参数与非法标识。 */
+export function validateNoteIds(input: unknown): string[] {
+  if (!Array.isArray(input)) invalid('手记标识列表不正确，请重新打开页面后重试。');
+  if (input.length > MAX_IMAGE_INDEX_NOTES)
+    invalid(`一次最多读取 ${MAX_IMAGE_INDEX_NOTES} 条手记的图片。`);
+  return input.map(identifier);
 }
 
 export function validateImageName(input: unknown): string {

@@ -16,6 +16,7 @@ import SearchPalette from './components/SearchPalette.vue';
 import RemovalDialog from './components/RemovalDialog.vue';
 import ToastStack from './components/ToastStack.vue';
 import { useLibrary } from './composables/useLibrary';
+import { useNoteImageIndex } from './composables/useNoteImageIndex';
 import { useNoteImages } from './composables/useNoteImages';
 import { useModalLayer } from './composables/useModalLayer';
 import { useTopics } from './composables/useTopics';
@@ -35,6 +36,8 @@ const api = window.memocraft;
 // 普通浏览器不伪造保存能力；正式应用必须通过 preload 接入本地库。
 const libraryApi = imageApi(api);
 const library = useLibrary(libraryApi);
+// 列表缩略图的图片摘要：随手记集合补齐，读取失败只提示一次，列表与正文不受影响。
+const noteImageIndex = useNoteImageIndex(libraryApi, (message) => announce(message));
 // 图集现场独立于正文编辑现场：改名字或删除图片不会触发手记版本冲突。
 const noteImages = useNoteImages(libraryApi);
 // 归纳列表由渲染端持有：收录数量、抽屉里的所属归纳与选择器状态都从这一份数据推导。
@@ -455,7 +458,10 @@ onMounted(() => {
   void library
     .initialize()
     .then(() => Promise.all([topicState.load(), threadState.load()]))
+    .then(() => noteImageIndex.load(notes.value.map((note) => note.id)))
     .then(() => undefined);
+  // 保存、删除与恢复都会替换手记集合；这里只补读还没问过的手记，重复调用不会重复请求。
+  watch(notes, (list) => void noteImageIndex.load(list.map((note) => note.id)));
   // 抽屉打开哪条手记，就读取哪条手记的引用位置；关闭时清空，避免显示上一条的结果。
   watch(
     () => editing.value?.id,
@@ -559,10 +565,12 @@ onBeforeUnmount(() => {
           :tag="tag"
           :highlighted="latestSavedId"
           :topics="topicState.topics.value"
+          :image-index="noteImageIndex.index.value"
           @open="openNote"
           @write="navigate('home')"
           @filter="filter = $event"
           @tag="tag = $event"
+          @notify="notify"
         />
         <TopicsPage
           v-else-if="page === 'topics'"
@@ -574,6 +582,7 @@ onBeforeUnmount(() => {
           :create-signal="createTopicSignal"
           :open-signal="openTopicSignal"
           :nav-signal="topicsNavSignal"
+          :image-index="noteImageIndex.index.value"
           @open-note="openNote"
           @notify="notify"
         />

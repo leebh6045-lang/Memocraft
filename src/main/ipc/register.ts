@@ -120,6 +120,16 @@ export function registerStoreIpc(
       return failure(error);
     }
   });
+  // 列表缩略图：载荷是手记 ID 数组，长度上限由 services 校验。
+  ipcMain.handle(CHANNELS.loadImageIndex, async (event, noteIds: unknown) => {
+    if (!isTrustedSender(event, window, rendererUrl))
+      return failure(new AppError('UNAVAILABLE', '请求来源无效。'));
+    try {
+      return await store.request({ operation: 'loadImageIndex', payload: noteIds });
+    } catch (error) {
+      return failure(error);
+    }
+  });
   ipcMain.handle(CHANNELS.addImages, async (event, payload: unknown) => {
     if (!isTrustedSender(event, window, rendererUrl))
       return failure(new AppError('UNAVAILABLE', '请求来源无效。'));
@@ -231,6 +241,7 @@ export function registerStoreIpc(
       ipcMain.removeHandler(channel);
     for (const channel of [
       CHANNELS.loadImages,
+      CHANNELS.loadImageIndex,
       CHANNELS.addImages,
       CHANNELS.addImagesFromDialog,
       CHANNELS.renameImage,

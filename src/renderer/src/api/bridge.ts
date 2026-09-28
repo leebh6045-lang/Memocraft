@@ -1,6 +1,6 @@
 import type { MemocraftApi } from '../../../shared/contracts';
 import type { Result } from '../../../shared/errors';
-import type { NoteImageList } from '../../../domain/note-image';
+import type { NoteImageIndex, NoteImageList } from '../../../domain/note-image';
 import type { TopicSummary } from '../../../domain/topic';
 import type { EntrySummary, NoteReference, ThreadSummary } from '../../../domain/thread';
 import type { RemovalImpact, TrashItem } from '../../../domain/trash';
@@ -16,6 +16,7 @@ function unavailable(): Promise<Result<never>> {
 }
 
 const emptyImages: Result<NoteImageList> = { ok: true, value: { images: [], totalBytes: 0 } };
+const emptyImageIndex: Result<NoteImageIndex> = { ok: true, value: {} };
 const emptyTopics: Result<TopicSummary[]> = { ok: true, value: [] };
 const emptyThreads: Result<ThreadSummary[]> = { ok: true, value: [] };
 const emptyEntries: Result<EntrySummary[]> = { ok: true, value: [] };
@@ -34,6 +35,7 @@ export const disconnectedApi: MemocraftApi = {
   updateNote: unavailable,
   search: unavailable,
   loadImages: () => Promise.resolve(emptyImages),
+  loadImageIndex: () => Promise.resolve(emptyImageIndex),
   addImagesFromDialog: () => Promise.resolve(emptyImages),
   addImageFromClipboard: () => Promise.resolve(emptyImages),
   renameImage: () => Promise.resolve(emptyImages),

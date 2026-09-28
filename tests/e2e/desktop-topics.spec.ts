@@ -110,8 +110,21 @@ test('真实桌面：新建归纳、多重收录、抽屉反查与移出', async
       await expect(picker).toHaveCount(0);
     };
     await collectInto('归纳验收样例一：事务回滚');
-    await expect(page.locator('.card-title')).toHaveCount(1);
+    // 归纳详情默认连读：收录进来的手记成为一个小节，目录同步。
+    await expect(page.locator('.doc-sec')).toHaveCount(1);
+    await expect(page.locator('.doc-toc a')).toHaveCount(1);
     await expect(page.getByText('已收录 1 条手记')).toBeVisible();
+
+    // 切到网格：卡片撑满格子，标签贴底，卡片不会再按内容收缩。
+    const detailLayouts = page.getByRole('radiogroup', { name: '呈现方式' });
+    await detailLayouts.getByRole('radio', { name: '网格' }).click();
+    const detailCard = page.locator('.topic-note .card');
+    await expect(detailCard).toHaveCount(1);
+    const noteBox = await detailCard.first().boundingBox();
+    const wrapperBox = await page.locator('.topic-note').first().boundingBox();
+    if (!noteBox || !wrapperBox) throw new Error('归纳内的卡片没有渲染出来。');
+    expect(Math.abs(noteBox.width - wrapperBox.width)).toBeLessThan(2);
+    await detailLayouts.getByRole('radio', { name: '连读' }).click();
 
     // 第二个归纳也收录同一条手记。
     await page

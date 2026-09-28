@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatClock,
   formatFullTime,
   formatTime,
   fromDateTimeInput,
@@ -37,6 +38,12 @@ describe('时间显示', () => {
   it('非法时间返回空字符串，不显示 Invalid Date', () => {
     expect(formatTime('not-a-date', now)).toBe('');
     expect(formatFullTime('not-a-date')).toBe('');
+    expect(formatClock('not-a-date')).toBe('');
+  });
+
+  it('按天分段里只写时刻，补零且按本地时区', () => {
+    expect(formatClock(local('2026-09-22T09:05:00'))).toBe('09:05');
+    expect(formatClock(local('2025-12-31T23:10:00'))).toBe('23:10');
   });
 });
 

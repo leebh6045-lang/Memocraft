@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { categoryLabel, noteTitle, type Note } from '../../../domain/note';
+import { categoryLabel, noteExcerpt, noteTitle, type Note } from '../../../domain/note';
 import { formatFullTime, formatTime } from '../format-time';
 
 const props = defineProps<{
@@ -11,11 +11,14 @@ const props = defineProps<{
    * 归纳详情里不必传：那里的每一条都已经在这个归纳里，标记没有信息量。
    */
   collected?: string[];
+  /** 替换卡片上的时间文字；只有「按时间」呈现按天分段时传入时刻，其余情况按统一规则显示。 */
+  timeLabel?: string;
 }>();
 defineEmits<{ open: [id: string] }>();
 
-const createdLabel = computed(() => formatTime(props.note.createdAt));
+const createdLabel = computed(() => props.timeLabel ?? formatTime(props.note.createdAt));
 const fullCreatedDate = computed(() => formatFullTime(props.note.createdAt));
+const excerpt = computed(() => noteExcerpt(props.note));
 const collectedLabel = computed(() =>
   props.collected?.length ? `已收录到：${props.collected.join('、')}` : '',
 );
@@ -33,7 +36,7 @@ const collectedLabel = computed(() =>
       <time :datetime="note.createdAt" :title="fullCreatedDate">{{ createdLabel }}</time>
     </span>
     <span class="card-title">{{ noteTitle(note) }}</span>
-    <span class="card-excerpt">{{ note.body }}</span>
+    <span v-if="excerpt" class="card-excerpt">{{ excerpt }}</span>
     <span v-if="note.tags.length || collected?.length" class="card-foot">
       <span v-for="tag in note.tags" :key="tag" class="tag-chip"
         ><span class="tag-hash" aria-hidden="true">#</span>{{ tag }}</span

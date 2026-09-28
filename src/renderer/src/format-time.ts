@@ -24,6 +24,16 @@ export function formatTime(iso: string, now: Date = new Date()): string {
   return `${date.getFullYear()}.${month}.${day}`;
 }
 
+/**
+ * 只写时刻「HH:MM」：仅用于随手记「按时间」呈现里按天分出的段——
+ * 日期已经写在日期栏上，卡片不再重复「今天」「09.25」。其余地方一律用 formatTime。
+ */
+export function formatClock(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 /** 悬停提示用的完整时间，避免为了精确值去猜相对文案。 */
 export function formatFullTime(iso: string): string {
   const date = new Date(iso);

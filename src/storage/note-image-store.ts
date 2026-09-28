@@ -13,12 +13,14 @@ import {
   type ImageInput,
   type ImageMimeType,
   type NoteImage,
+  type NoteImageIndex,
   type NoteImageList,
+  type NoteImageSummary,
 } from '../domain/note-image';
 import { AppError } from '../shared/errors';
 import { requireMigrationVersion, transaction } from './database';
 import { SCHEMA_VERSION } from './schema';
-import { IMAGE_SELF_VISIBLE, NOTE_VISIBLE } from './visibility';
+import { IMAGE_SELF_VISIBLE, IMAGE_VISIBLE, NOTE_VISIBLE } from './visibility';
 
 export const ATTACHMENTS_DIRECTORY = 'attachments';
 
@@ -72,6 +74,40 @@ export class NoteImageStore {
       .all(noteId);
     const images = rows.map((row) => this.imageFromRow(row));
     return { images, totalBytes: images.reduce((total, image) => total + image.byteSize, 0) };
+  }
+
+  /**
+   * 列表缩略图用：一次取回一批手记的图片摘要，避免为每条手记单独发起请求。
+   * 可见性与 list 一致（图片与所属手记都未删除），只取展示需要的列，不读文件。
+   */
+  listSummaries(noteIds: string[]): NoteImageIndex {
+    if (noteIds.length === 0) return {};
+    const placeholders = noteIds.map(() => '?').join(', ');
+    const rows = this.database
+      .prepare(
+        `SELECT note_images.id, note_images.note_id, note_images.display_name, note_images.original_name,
+                note_images.width, note_images.height
+           FROM note_images
+           JOIN notes ON notes.id = note_images.note_id
+          WHERE note_images.note_id IN (${placeholders}) AND ${IMAGE_VISIBLE}
+          ORDER BY note_images.note_id, note_images.position, note_images.id`,
+      )
+      .all(...noteIds);
+    const index: NoteImageIndex = {};
+    for (const row of rows) {
+      const noteId = stringField(row, 'note_id');
+      const summary: NoteImageSummary = {
+        id: stringField(row, 'id'),
+        displayName: stringField(row, 'display_name'),
+        originalName: stringField(row, 'original_name'),
+        width: numberField(row, 'width'),
+        height: numberField(row, 'height'),
+      };
+      const bucket = index[noteId];
+      if (bucket) bucket.push(summary);
+      else index[noteId] = [summary];
+    }
+    return index;
   }
 
   add(noteId: string, inputs: ImageInput[]): NoteImageList {

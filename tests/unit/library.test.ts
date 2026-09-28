@@ -8,7 +8,7 @@ import {
   type NoteEdit,
 } from '../../src/domain/note';
 import type { MemocraftApi } from '../../src/shared/contracts';
-import type { NoteImageList } from '../../src/domain/note-image';
+import type { NoteImageIndex, NoteImageList } from '../../src/domain/note-image';
 import type { SearchResult } from '../../src/domain/search';
 import type { TopicSummary } from '../../src/domain/topic';
 import type { EntrySummary, NoteReference, ThreadSummary } from '../../src/domain/thread';
@@ -72,6 +72,9 @@ class ControlledApi implements MemocraftApi {
   // 图集不在本文件覆盖范围内：这里只提供满足契约的空实现。
   async loadImages(): Promise<Result<NoteImageList>> {
     return { ok: true, value: { images: [], totalBytes: 0 } };
+  }
+  async loadImageIndex(): Promise<Result<NoteImageIndex>> {
+    return { ok: true, value: {} };
   }
   async addImagesFromDialog(): Promise<Result<NoteImageList>> {
     return { ok: true, value: { images: [], totalBytes: 0 } };

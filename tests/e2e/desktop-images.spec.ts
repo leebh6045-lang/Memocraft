@@ -108,6 +108,14 @@ test('真实桌面：粘贴图片、命名、放大查看与移出，重启后�
       .getByRole('button', { name: /随手记/ })
       .first()
       .click();
+    // 阅读流卡片露出附图：顶部写张数，缩略图仍按图片 ID 取图。
+    const layouts = page.getByRole('radiogroup', { name: '呈现方式' });
+    await layouts.getByRole('radio', { name: '阅读流' }).click();
+    const streamCard = page.locator('.stream-card').first();
+    await expect(streamCard).toContainText('1 张图');
+    await expect(streamCard.locator('.stream-images img')).toHaveCount(1);
+    await expect(streamCard.locator('.stream-images img')).toHaveAttribute('alt', '架构草图');
+    await layouts.getByRole('radio', { name: '网格' }).click();
     await page.locator('.card').first().click();
     const reopened = page.getByRole('dialog', { name: '手记详情' });
     await expect(reopened.getByRole('button', { name: '放大查看 架构草图' })).toBeVisible();

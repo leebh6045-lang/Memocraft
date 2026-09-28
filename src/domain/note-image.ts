@@ -35,6 +35,24 @@ export interface NoteImageList {
   totalBytes: number;
 }
 
+/**
+ * 列表缩略图只要这些字段：ID 用于按 ID 取图，名称与尺寸用于可读名称和占位。
+ * 不含相对路径与字节，渲染端仍然拿不到文件位置。
+ */
+export interface NoteImageSummary {
+  id: string;
+  displayName: string;
+  originalName: string;
+  width: number;
+  height: number;
+}
+
+/** 一批手记的附图摘要，按手记 ID 分组；没有附图的手记可以不出现在结果里。 */
+export type NoteImageIndex = Record<string, NoteImageSummary[]>;
+
+/** 一次批量读取的手记条数上限：列表一次显示不了更多，也避免一条 SQL 塞入过多参数。 */
+export const MAX_IMAGE_INDEX_NOTES = 200;
+
 export interface ImageCapacity {
   count: number;
   bytes: number;
@@ -145,7 +163,13 @@ function readJpegSize(bytes: Uint8Array, view: DataView): { width: number; heigh
   return null;
 }
 
-/** 显示名称优先用户命名，其次原文件名，最后按序号兜底；都不写回数据库字段。 */
-export function imageLabel(image: NoteImage, index: number): string {
+/**
+ * 显示名称优先用户命名，其次原文件名，最后按序号兜底；都不写回数据库字段。
+ * 只要求命名相关的字段，图集与列表摘要都能复用同一条规则。
+ */
+export function imageLabel(
+  image: Pick<NoteImage, 'displayName' | 'originalName'>,
+  index: number,
+): string {
   return image.displayName.trim() || image.originalName.trim() || `图片 ${index + 1}`;
 }

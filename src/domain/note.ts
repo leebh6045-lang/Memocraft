@@ -54,6 +54,17 @@ export function noteTitle(note: NoteContent): string {
   );
 }
 
+/**
+ * 卡片与阅读流用的正文摘要。没填标题时，标题已经取自正文首个非空行，
+ * 摘要就跳过这一行，避免同一句话在卡片上出现两次；只影响展示，正文数据不变。
+ */
+export function noteExcerpt(note: NoteContent): string {
+  if (note.title.trim()) return note.body.trim();
+  const lines = note.body.split('\n');
+  const firstContentLine = lines.findIndex((line) => line.trim());
+  return (firstContentLine < 0 ? '' : lines.slice(firstContentLine + 1).join('\n')).trim();
+}
+
 export function categoryLabel(category: NoteCategory): string {
   return NOTE_CATEGORIES.find((item) => item.value === category)?.label ?? '杂项';
 }
