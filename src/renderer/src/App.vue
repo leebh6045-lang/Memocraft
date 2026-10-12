@@ -102,6 +102,8 @@ const pages = [
 /** 设置是辅助页面，不占主导航位置，因此不进 pages 数组。 */
 type Page = (typeof pages)[number]['id'] | 'settings' | 'trash' | 'review';
 const page = ref<Page>('home');
+// 普通设置入口默认外观，AI 引导直接定位配置；仅在导航保存成功后提交意图。
+const settingsInitialSection = ref<'appearance' | 'ai'>('appearance');
 // 现场由应用壳持有：卸载回顾页面不会丢失已生成结果或选定周期。
 const review = useReview(libraryApi, () => notes.value);
 watch(page, (target, previous) => {
@@ -185,7 +187,10 @@ function announce(message: string, action?: { label: string; run: () => void }) 
   pushToast(message, { action });
 }
 
-async function navigate(target: Page): Promise<boolean> {
+async function navigate(
+  target: Page,
+  settingsSection: 'appearance' | 'ai' = 'appearance',
+): Promise<boolean> {
   if (busy.value || searchOpen.value) return false;
   navigating.value = true;
   try {
@@ -196,6 +201,7 @@ async function navigate(target: Page): Promise<boolean> {
     if (!(await library.closeNote())) return false;
     // 只在保存成功后切页；动画负责呈现变化，不参与业务提交。
     scrollPositions.set(page.value, window.scrollY);
+    if (target === 'settings') settingsInitialSection.value = settingsSection;
     page.value = target;
     if (target !== 'home') aiSuggestion.reset();
     // 归纳的一次性意图只在当次进入有效，离开时清空，避免下次进入又弹出表单。
@@ -262,7 +268,7 @@ async function requestSuggestion() {
     announce('请先在设置页配置 DeepSeek API Key。', {
       label: '前往设置',
       run: () => {
-        void navigate('settings');
+        void navigate('settings', 'ai');
       },
     });
   }
@@ -830,6 +836,7 @@ onBeforeUnmount(() => {
           :theme="themePreference"
           :bridge="libraryApi"
           :busy="busy"
+          :initial-section="settingsInitialSection"
           @update:theme="setThemePreference"
           @notify="notify"
           @data-replaced="refreshAfterLibraryRestore"
@@ -839,7 +846,7 @@ onBeforeUnmount(() => {
           key="review"
           :state="review"
           :busy="busy"
-          @navigate="navigate"
+          @navigate="navigate($event, 'ai')"
         />
         <PlannedModule v-else :key="page" :module="page" />
       </Transition>

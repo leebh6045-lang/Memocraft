@@ -131,6 +131,7 @@ describe('回顾 App 接线与知识库生命周期', () => {
     app.getComponent(ReviewPage).vm.$emit('navigate', 'settings');
     await flushPromises();
     expect(app.findComponent(SettingsPage).exists()).toBe(true);
+    expect(app.getComponent(SettingsPage).props('initialSection')).toBe('ai');
     vi.mocked(bridge.ai.loadSettings).mockResolvedValue(
       success({
         provider: 'deepseek',

@@ -27,7 +27,12 @@ test('真实桌面：备份、恢复、损坏备份拒绝与可读导出', async
     electron.launch({
       executablePath: process.env.MEMOCRAFT_TEST_APP,
       args: process.env.MEMOCRAFT_TEST_APP ? [] : [resolve('.')],
-      env: { ...process.env, MEMOCRAFT_DATA_DIR: directory },
+      // 数据流程同样隔离 Chromium 配置与凭据，避免读取日常应用的 AI 密钥。
+      env: {
+        ...process.env,
+        MEMOCRAFT_DATA_DIR: directory,
+        MEMOCRAFT_USER_DATA_DIR: join(directory, 'shell'),
+      },
     });
   const quit = async (current: ElectronApplication) => {
     const stopped = current.waitForEvent('close');
@@ -79,6 +84,7 @@ test('真实桌面：备份、恢复、损坏备份拒绝与可读导出', async
     // 备份到固定位置。
     await page.getByRole('button', { name: /设置/ }).click();
     await expect(page.getByRole('heading', { name: '设置', exact: true })).toBeVisible();
+    await page.getByRole('tab', { name: '数据与备份', exact: true }).click();
     await stubSaveDialog(packPath);
     await page.getByRole('button', { name: '选择位置并备份' }).click();
     await expect(page.locator('.toast').filter({ hasText: '已备份' })).toBeVisible();
@@ -101,6 +107,7 @@ test('真实桌面：备份、恢复、损坏备份拒绝与可读导出', async
 
     // 恢复：先校验（不改动数据），确认框显示备份内容统计。
     await page.getByRole('button', { name: /设置/ }).click();
+    await page.getByRole('tab', { name: '数据与备份', exact: true }).click();
     await stubOpenDialog(packPath);
     await page.getByRole('button', { name: '选择备份并校验…' }).click();
     const confirm = page.getByRole('dialog', { name: '从备份恢复' });
@@ -134,6 +141,7 @@ test('真实桌面：备份、恢复、损坏备份拒绝与可读导出', async
     );
     await stubOpenDialog(brokenPackPath);
     await page.getByRole('button', { name: /设置/ }).click();
+    await page.getByRole('tab', { name: '数据与备份', exact: true }).click();
     await page.getByRole('button', { name: '选择备份并校验…' }).click();
     await expect(page.locator('.data-error')).toContainText('更新版本');
     await expect(page.getByRole('dialog', { name: '从备份恢复' })).toHaveCount(0);
@@ -145,6 +153,7 @@ test('真实桌面：备份、恢复、损坏备份拒绝与可读导出', async
 
     // 可读导出：正文与关系元数据都在 Markdown 里。
     await page.getByRole('button', { name: /设置/ }).click();
+    await page.getByRole('tab', { name: '数据与备份', exact: true }).click();
     await stubSaveDialog(exportPath);
     await page.getByRole('button', { name: '导出…' }).click();
     await expect(page.locator('.toast').filter({ hasText: '已导出' })).toBeVisible();

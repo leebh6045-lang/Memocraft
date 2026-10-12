@@ -63,6 +63,8 @@ async function mountSettings(bridge: MemocraftApi): Promise<VueWrapper> {
     props: { theme: 'light', bridge, busy: false },
   });
   await flushPromises();
+  // 恢复操作在二级「数据与备份」页执行，不绕过隐藏页直接点业务按钮。
+  await click(wrapper.element, '数据与备份');
   return wrapper;
 }
 
@@ -83,6 +85,11 @@ function dialog(): HTMLElement {
 async function click(root: ParentNode, label: string): Promise<void> {
   button(root, label).click();
   await flushPromises();
+}
+
+function expectTabsLocked(settings: VueWrapper, locked: boolean): void {
+  for (const tab of settings.findAll<HTMLButtonElement>('[role="tab"]'))
+    expect(tab.element.disabled).toBe(locked);
 }
 
 async function escape(): Promise<void> {
@@ -113,8 +120,10 @@ describe('设置页恢复对话框的取消边界', () => {
     const settings = await mountSettings(f.bridge);
     await click(settings.element, '选择备份并校验…');
     expect(dialog().textContent).toContain('手记 3 · 归纳 1 · 事务 1 · 动态 2');
+    expectTabsLocked(settings, true);
     await escape();
     expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expectTabsLocked(settings, false);
     expect(f.applyRestore).not.toHaveBeenCalled();
     expect(settings.emitted('data-replaced')).toBeUndefined();
     expect(settings.emitted('notify')).toBeUndefined();
@@ -122,6 +131,7 @@ describe('设置页恢复对话框的取消边界', () => {
     await click(settings.element, '选择备份并校验…');
     await click(dialog(), '取消');
     expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expectTabsLocked(settings, false);
     expect(f.restoreLibrary).toHaveBeenCalledTimes(2);
     expect(f.applyRestore).not.toHaveBeenCalled();
   });
@@ -135,6 +145,7 @@ describe('设置页恢复对话框的取消边界', () => {
     expect(button(confirmation, '取消').disabled).toBe(true);
     expect(button(confirmation, '开始恢复').disabled).toBe(true);
     expect(button(settings.element, '选择备份并校验…').disabled).toBe(true);
+    expectTabsLocked(settings, true);
     expect(settings.get('[role="status"]').text()).toContain('正在恢复');
     await escape();
     await escape();
@@ -150,6 +161,7 @@ describe('设置页恢复对话框的取消边界', () => {
     expect(settings.find('[role="status"]').exists()).toBe(false);
     expect(settings.find('.data-error').exists()).toBe(false);
     expect(button(settings.element, '选择备份并校验…').disabled).toBe(false);
+    expectTabsLocked(settings, false);
     expect(settings.emitted('data-replaced')).toEqual([[]]);
     expect(settings.emitted('notify')).toEqual([[{ message: '恢复完成，已重新打开数据' }]]);
     expect(settings.get('h1').text()).toBe('设置');
@@ -162,6 +174,7 @@ describe('设置页恢复对话框的取消边界', () => {
     await click(dialog(), '开始恢复');
     await escape();
     expect(dialog().isConnected).toBe(true);
+    expectTabsLocked(settings, true);
     f.pending.resolve({
       ok: false,
       error: { code: 'STORAGE', message: '恢复后的数据无法打开，已回滚到恢复前的数据。' },
@@ -174,6 +187,7 @@ describe('设置页恢复对话框的取消边界', () => {
       '恢复后的数据无法打开，已回滚到恢复前的数据。',
     );
     expect(button(settings.element, '选择备份并校验…').disabled).toBe(false);
+    expectTabsLocked(settings, false);
     expect(settings.find('[role="status"]').exists()).toBe(false);
     expect(settings.emitted('data-replaced')).toBeUndefined();
     expect(settings.emitted('notify')).toBeUndefined();

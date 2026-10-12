@@ -57,6 +57,7 @@ async function quit(app: ElectronApplication): Promise<void> {
 
 async function openSettings(page: Page): Promise<Locator> {
   await page.getByRole('button', { name: /设置/ }).first().click();
+  await page.getByRole('tab', { name: 'AI 服务', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'AI 设置', exact: true })).toBeVisible();
   return page.getByRole('region', { name: 'AI 设置', exact: true });
 }

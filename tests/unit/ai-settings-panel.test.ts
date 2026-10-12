@@ -467,6 +467,62 @@ describe('AI 设置与测试连接', () => {
     expect(panel.text()).not.toContain('连接成功');
   });
 
+  it('分类隐藏取消自己的测试，旧成功与取消应答不覆盖返回后的新测试', async () => {
+    const ai = makeApi({ keyConfigured: true });
+    const first = deferred<Result<AiConnectionTest>>();
+    const second = deferred<Result<AiConnectionTest>>();
+    const cancellation = deferred<Result<null>>();
+    vi.mocked(ai.testConnection)
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    vi.mocked(ai.cancelTest).mockReturnValueOnce(cancellation.promise);
+    const panel = await mountPanel(ai);
+    await button(panel, '测试连接').trigger('click');
+    const requestId = vi.mocked(ai.testConnection).mock.calls[0]?.[0];
+    await panel.setProps({ active: false });
+    expect(ai.cancelTest).toHaveBeenCalledExactlyOnceWith(requestId);
+    expect(button(panel, '测试连接').attributes('disabled')).toBeDefined();
+    await panel.setProps({ active: true });
+    expect(ai.loadSettings).toHaveBeenCalledTimes(1);
+    await button(panel, '测试连接').trigger('click');
+    first.resolve(
+      success({ model: 'deepseek-flash', checkedAt: '2026-10-10T10:00:00.000Z', elapsedMs: 5 }),
+    );
+    cancellation.resolve(success(null));
+    await flushPromises();
+    expect(panel.text()).not.toContain('连接成功');
+    expect(button(panel, '取消测试').exists()).toBe(true);
+    second.resolve(
+      success({ model: 'deepseek-flash', checkedAt: '2026-10-10T10:00:00.000Z', elapsedMs: 20 }),
+    );
+    await flushPromises();
+    expect(panel.text()).toContain('连接成功');
+  });
+
+  it('无测试时分类隐藏保留输入、保存回执与已完成测试结果', async () => {
+    const ai = makeApi();
+    const panel = await mountPanel(ai);
+    await panel.get('#ai-key').setValue('test-only-settings-key');
+    await button(panel, '保存密钥').trigger('click');
+    await flushPromises();
+    await button(panel, '测试连接').trigger('click');
+    await flushPromises();
+    await panel.setProps({ active: false });
+    await panel.setProps({ active: true });
+    expect(panel.find('.key-saved-notice').exists()).toBe(true);
+    expect(panel.text()).toContain('连接成功');
+    await panel.get('#ai-base-url').setValue('https://draft.example/v1');
+    await panel.get('#ai-key').setValue('unsaved-test-key');
+    await panel.setProps({ active: false });
+    await panel.setProps({ active: true });
+    expect(panel.get<HTMLInputElement>('#ai-base-url').element.value).toBe(
+      'https://draft.example/v1',
+    );
+    expect(panel.get<HTMLInputElement>('#ai-key').element.value).toBe('unsaved-test-key');
+    expect(ai.loadSettings).toHaveBeenCalledTimes(1);
+    expect(ai.cancelTest).not.toHaveBeenCalled();
+  });
+
   it('卸载取消自己的请求，迟到结果不会更新新组件', async () => {
     const ai = makeApi({ keyConfigured: true });
     const pending = deferred<Result<AiConnectionTest>>();

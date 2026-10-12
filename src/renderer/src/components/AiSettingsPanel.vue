@@ -4,7 +4,10 @@ import { AI_MODELS, DEFAULT_AI_MODEL, DEFAULT_AI_BASE_URL } from '../../../share
 import type { AiApi, AiConnectionTest, AiSettings } from '../../../shared/ai';
 import AppIcon from './AppIcon.vue';
 
-const props = defineProps<{ ai: AiApi; busy?: boolean }>();
+const props = withDefaults(
+  defineProps<{ ai: AiApi; busy?: boolean; active?: boolean; embedded?: boolean }>(),
+  { active: true, embedded: false },
+);
 const emit = defineEmits<{ notify: [payload: { message: string }] }>();
 
 const settings = ref<AiSettings | null>(null);
@@ -34,6 +37,7 @@ const hasAddressDraft = computed(
 );
 const canTest = computed(
   () =>
+    props.active &&
     !locked.value &&
     !!settings.value?.keyConfigured &&
     !!settings.value.encryptionAvailable &&
@@ -261,6 +265,20 @@ async function cancelTest(): Promise<void> {
 
 onMounted(() => void loadSettings());
 watch(
+  () => props.active,
+  (active) => {
+    const requestId = activeTest.value;
+    if (active || !requestId) return;
+    // 分类隐藏仍保留组件；先撤销测试身份，迟到应答不能覆盖返回后的新测试。
+    activeTest.value = null;
+    cancelling.value = false;
+    resetFeedback();
+    void props.ai.cancelTest(requestId).catch(() => {
+      // 隐藏页不回显旧请求的清理异常；主进程总超时仍会释放资源。
+    });
+  },
+);
+watch(
   () => props.busy,
   (busy, previouslyBusy) => {
     // 数据恢复会改地址与模型；长任务结束后重新读取，同时保留尚未提交的密钥输入。
@@ -280,7 +298,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="panel" aria-labelledby="ai-settings-title">
+  <section class="panel" :class="{ embedded }" aria-labelledby="ai-settings-title">
     <h2 id="ai-settings-title">AI 设置</h2>
     <p class="panel-sub">配置保存在本机，密钥单独加密保存，不随知识库备份或导出。</p>
 
@@ -460,6 +478,17 @@ onBeforeUnmount(() => {
 .panel h2 {
   font-size: 15px;
 }
+.panel.embedded {
+  margin-bottom: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.panel.embedded h2 {
+  font-size: 20px;
+}
 .panel-sub,
 .pr-hint,
 .protection-hint,
@@ -587,6 +616,22 @@ select {
     flex-direction: column;
   }
   .key-controls {
+    width: 100%;
+  }
+}
+/* 分类菜单占用部分宽度，按实际表单宽度换行，避免最小桌面窗口挤压输入。 */
+@container (max-width: 460px) {
+  .embedded .panel-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .embedded .panel-row > select,
+  .embedded .panel-row > button,
+  .embedded .provider-name {
+    align-self: flex-end;
+  }
+  .embedded .key-controls {
     width: 100%;
   }
 }

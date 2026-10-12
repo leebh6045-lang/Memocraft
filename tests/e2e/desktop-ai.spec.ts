@@ -49,6 +49,7 @@ async function mockCompletion(app: ElectronApplication, model: AiModel): Promise
 async function openSettings(page: Page): Promise<void> {
   await expect(page.getByRole('button', { name: /设置/ })).toBeVisible();
   await page.getByRole('button', { name: /设置/ }).click();
+  await page.getByRole('tab', { name: 'AI 服务', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'AI 设置', exact: true })).toBeVisible();
 }
 
@@ -195,24 +196,28 @@ test('真实桌面：AI 加密配置、两个模型、取消、备份恢复与�
     await app.evaluate(({ dialog }, path) => {
       dialog.showSaveDialog = async () => ({ canceled: false, filePath: path });
     }, packPath);
+    await page.getByRole('tab', { name: '数据与备份', exact: true }).click();
     await page.getByRole('button', { name: '选择位置并备份', exact: true }).click();
     await expect(page.locator('.toast').filter({ hasText: '已备份' })).toBeVisible();
     expect(existsSync(join(packPath, 'credentials'))).toBe(false);
     expect(readFileSync(join(packPath, 'memocraft.sqlite')).includes(Buffer.from(testKey))).toBe(
       false,
     );
+    await page.getByRole('tab', { name: 'AI 服务', exact: true }).click();
     await model.selectOption(DEFAULT_AI_MODEL);
     await expect(model).toHaveValue(DEFAULT_AI_MODEL);
     await expect(panel.getByRole('status').filter({ hasText: '模型已保存' })).toBeVisible();
     await app.evaluate(({ dialog }, path) => {
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
     }, packPath);
+    await page.getByRole('tab', { name: '数据与备份', exact: true }).click();
     await page.getByRole('button', { name: '选择备份并校验…', exact: true }).click();
     const restore = page.getByRole('dialog', { name: '从备份恢复', exact: true });
     await expect(restore).toBeVisible();
     await restore.getByRole('button', { name: '开始恢复', exact: true }).click();
     await expect(page.locator('.toast').filter({ hasText: '恢复完成' })).toBeVisible();
     expect(readFileSync(credentialPath)).toEqual(encrypted);
+    await page.getByRole('tab', { name: 'AI 服务', exact: true }).click();
     await expect(model).toHaveValue('deepseek-v4-pro');
     await expect(configured).toHaveText('已配置');
 

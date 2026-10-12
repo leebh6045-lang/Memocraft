@@ -90,6 +90,7 @@ function capturedRequests(app: ElectronApplication): Promise<EndpointRequest[]> 
 
 async function openSettings(page: Page): Promise<void> {
   await page.getByRole('button', { name: /设置/ }).click();
+  await page.getByRole('tab', { name: 'AI 服务', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'AI 设置', exact: true })).toBeVisible();
 }
 
@@ -218,12 +219,16 @@ test('真实桌面：自定义 AI 地址覆盖全部业务、输入保留、官�
 
     await openSettings(page);
     await expect(baseUrl).toHaveValue(customBaseUrl);
+    await page.getByRole('tab', { name: '外观', exact: true }).click();
     await page.getByRole('radio', { name: '浅色', exact: true }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await page.getByRole('tab', { name: 'AI 服务', exact: true }).click();
     await baseUrl.scrollIntoViewIfNeeded();
     await page.screenshot({ path: 'test-results/ai-endpoint-light.png', animations: 'disabled' });
+    await page.getByRole('tab', { name: '外观', exact: true }).click();
     await page.getByRole('radio', { name: '深色', exact: true }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await page.getByRole('tab', { name: 'AI 服务', exact: true }).click();
     await baseUrl.scrollIntoViewIfNeeded();
     await page.screenshot({ path: 'test-results/ai-endpoint-dark.png', animations: 'disabled' });
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(1000, 700));
@@ -244,6 +249,7 @@ test('真实桌面：自定义 AI 地址覆盖全部业务、输入保留、官�
     await app.evaluate(({ dialog }, filePath) => {
       dialog.showSaveDialog = async () => ({ canceled: false, filePath });
     }, packPath);
+    await page.getByRole('tab', { name: '数据与备份', exact: true }).click();
     await page.getByRole('button', { name: '选择位置并备份', exact: true }).click();
     await expect(page.locator('.toast').filter({ hasText: '已备份' })).toBeVisible();
     expect(existsSync(join(packPath, 'credentials'))).toBe(false);
@@ -251,6 +257,7 @@ test('真实桌面：自定义 AI 地址覆盖全部业务、输入保留、官�
       false,
     );
 
+    await page.getByRole('tab', { name: 'AI 服务', exact: true }).click();
     await baseUrl.fill('   ');
     await saveAddress.click();
     await expect(baseUrl).toHaveValue(officialBaseUrl);
@@ -269,11 +276,13 @@ test('真实桌面：自定义 AI 地址覆盖全部业务、输入保留、官�
     await app.evaluate(({ dialog }, path) => {
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
     }, packPath);
+    await page.getByRole('tab', { name: '数据与备份', exact: true }).click();
     await page.getByRole('button', { name: '选择备份并校验…', exact: true }).click();
     const restore = page.getByRole('dialog', { name: '从备份恢复', exact: true });
     await expect(restore).toBeVisible();
     await restore.getByRole('button', { name: '开始恢复', exact: true }).click();
     await expect(page.locator('.toast').filter({ hasText: '恢复完成' })).toBeVisible();
+    await page.getByRole('tab', { name: 'AI 服务', exact: true }).click();
     await expect(baseUrl).toHaveValue(customBaseUrl);
     await expect(panel.locator('label[for="ai-key"] .pr-hint')).toHaveText('已配置');
     expect(readFileSync(credentialPath)).toEqual(encryptedKey);
