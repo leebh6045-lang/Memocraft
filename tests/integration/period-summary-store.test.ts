@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -72,6 +72,25 @@ function summary(overrides: Partial<AiPeriodSummary> = {}): AiPeriodSummary {
     generatedAt: '2026-10-11T04:00:00.000Z',
     ...overrides,
   };
+}
+
+/** 历史库样例只使用当时的列，避免新存储实现反向依赖尚未执行的迁移。 */
+function insertLegacySummary(notes: NoteStore, value: AiPeriodSummary): void {
+  notes
+    .connection()
+    .prepare(
+      `INSERT INTO ai_period_summaries
+        (period_type, start_date, summary, suggestions, note_count, generated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      value.periodType,
+      value.startDate,
+      value.summary,
+      JSON.stringify(value.suggestions),
+      value.noteCount,
+      value.generatedAt,
+    );
 }
 
 beforeEach(() => {
@@ -269,11 +288,214 @@ describe('周期总结 SQLite 缓存', () => {
       'suggestions',
       'note_count',
       'generated_at',
+      'point_sources',
     ]);
+    expect(
+      notes.connection().prepare('SELECT point_sources FROM ai_period_summaries').get()
+        ?.point_sources,
+    ).toBeNull();
     close(notes);
     expect(
       new PeriodSummaryStore(open().connection()).loadPeriodSummary('week', '2026-10-05'),
     ).toEqual(summary());
+  });
+
+  it('分点来源按组跨连接重开保留，并随完整备份恢复', async () => {
+    const data = join(directory, 'sourced-data');
+    const notes = open(data);
+    const first = note(notes, query.startAt, { title: '事务实践' });
+    const second = note(notes, query.startAt, { title: '索引实践' });
+    const value = summary({
+      summary: '- **事务**：保留提交与回滚的实践。\n- **索引**：积累查询性能的记录。',
+      pointSources: [
+        [{ index: 1, noteId: first.id, title: first.title }],
+        [
+          { index: 1, noteId: first.id, title: first.title },
+          { index: 2, noteId: second.id, title: second.title },
+        ],
+      ],
+      noteCount: 2,
+    });
+    new PeriodSummaryStore(notes.connection()).savePeriodSummary(value);
+    close(notes);
+    const reopened = open(data);
+    expect(
+      new PeriodSummaryStore(reopened.connection()).loadPeriodSummary('week', '2026-10-05'),
+    ).toEqual(value);
+    const pack = join(directory, 'sourced-backup');
+    await backupLibrary(reopened, new NoteImageStore(reopened.connection(), data), pack);
+    const target = join(directory, 'sourced-restored');
+    await restoreDatabaseBackup(pack, target, migrationsDirectory);
+    const restored = open(target);
+    expect(
+      new PeriodSummaryStore(restored.connection()).loadPeriodSummary('week', '2026-10-05'),
+    ).toEqual(value);
+    expect(restored.load()).toEqual(reopened.load());
+  });
+
+  it('来源手记软删除不改写已生成映射，重新生成旧格式时不会留下旧链接', () => {
+    const notes = open();
+    const saved = note(notes, query.startAt, { title: '事务记录' });
+    const periods = new PeriodSummaryStore(notes.connection());
+    const value = summary({
+      summary: '- **事务**：记录了提交与回滚。',
+      pointSources: [[{ index: 1, noteId: saved.id, title: saved.title }]],
+    });
+    periods.savePeriodSummary(value);
+    notes.remove(saved.id);
+    expect(periods.loadPeriodSummary('week', '2026-10-05')).toEqual(value);
+    // 旧缓存仍可写读；覆盖时必须同步清掉映射，不能把旧链接附在新正文后面。
+    periods.savePeriodSummary(summary());
+    expect(periods.loadPeriodSummary('week', '2026-10-05')).toEqual(summary());
+    expect(
+      notes.connection().prepare('SELECT point_sources FROM ai_period_summaries').get()
+        ?.point_sources,
+    ).toBeNull();
+  });
+
+  it('缺少可展示链接的分点可保留空来源组，并支持六个不同分点', () => {
+    const notes = open();
+    const value = summary({
+      summary: Array.from({ length: 6 }, (_, index) => `- **方向 ${index + 1}**：保留总结。`).join(
+        '\n',
+      ),
+      pointSources: Array.from({ length: 6 }, () => []),
+    });
+    const periods = new PeriodSummaryStore(notes.connection());
+    periods.savePeriodSummary(value);
+    expect(periods.loadPeriodSummary('week', '2026-10-05')).toEqual(value);
+  });
+
+  it('来源与正文原位更新，SQLite 写入失败保留原有配对结果', () => {
+    const notes = open();
+    const periods = new PeriodSummaryStore(notes.connection());
+    const first = note(notes, query.startAt, { title: '第一条实践' });
+    const second = note(notes, query.startAt, { title: '第二条实践' });
+    const previous = summary({
+      summary: '- **第一方向**：原有积累。',
+      pointSources: [[{ index: 1, noteId: first.id, title: first.title }]],
+    });
+    const replacement = summary({
+      summary: '- **第二方向**：更新后的积累。',
+      pointSources: [[{ index: 2, noteId: second.id, title: second.title }]],
+      generatedAt: '2026-10-11T05:00:00.000Z',
+    });
+    periods.savePeriodSummary(previous);
+    notes.connection().exec('PRAGMA query_only = ON');
+    try {
+      expect(() => periods.savePeriodSummary(replacement)).toThrow();
+      expect(periods.loadPeriodSummary('week', '2026-10-05')).toEqual(previous);
+    } finally {
+      notes.connection().exec('PRAGMA query_only = OFF');
+    }
+    periods.savePeriodSummary(replacement);
+    expect(periods.loadPeriodSummary('week', '2026-10-05')).toEqual(replacement);
+    expect(
+      notes.connection().prepare('SELECT COUNT(*) AS total FROM ai_period_summaries').get()?.total,
+    ).toBe(1);
+  });
+
+  it.each([
+    ['来源 JSON 无法解析', 'not-json'],
+    ['来源非数组', '{}'],
+    ['来源组数与分点数不同', '[[],[]]'],
+    ['来源组不是数组', '[{}]'],
+    ['来源索引小于一', JSON.stringify([[{ index: 0, noteId: 'note-a', title: '原手记' }]])],
+    ['来源索引超过采样上限', JSON.stringify([[{ index: 21, noteId: 'note-a', title: '原手记' }]])],
+    ['来源索引不是整数', JSON.stringify([[{ index: 1.5, noteId: 'note-a', title: '原手记' }]])],
+    ['来源手记 ID 为空', JSON.stringify([[{ index: 1, noteId: '  ', title: '原手记' }]])],
+    [
+      '来源手记 ID 超长',
+      JSON.stringify([[{ index: 1, noteId: 'n'.repeat(129), title: '原手记' }]]),
+    ],
+    ['来源标题为空', JSON.stringify([[{ index: 1, noteId: 'note-a', title: '  ' }]])],
+    ['来源标题超长', JSON.stringify([[{ index: 1, noteId: 'note-a', title: '字'.repeat(301) }]])],
+    [
+      '同一分点重复来源索引',
+      JSON.stringify([
+        [
+          { index: 1, noteId: 'note-a', title: '原手记' },
+          { index: 1, noteId: 'note-b', title: '另一手记' },
+        ],
+      ]),
+    ],
+    [
+      '单组来源超过采样上限',
+      JSON.stringify([
+        Array.from({ length: 21 }, (_, index) => ({
+          index: index + 1,
+          noteId: `note-${index}`,
+          title: '原手记',
+        })),
+      ]),
+    ],
+  ])('%s 时明确报 STORAGE，损坏映射和正文保持原样', (_label, damagedSources) => {
+    const notes = open();
+    const periods = new PeriodSummaryStore(notes.connection());
+    periods.savePeriodSummary(summary({ summary: '- **事务**：保留原始总结。' }));
+    // 在隔离库模拟不受数据库 CHECK 保护的损坏文件，读取失败不能清理或覆盖原行。
+    notes.connection().exec('PRAGMA ignore_check_constraints = ON');
+    notes
+      .connection()
+      .prepare('UPDATE ai_period_summaries SET point_sources = ?')
+      .run(damagedSources);
+    notes.connection().exec('PRAGMA ignore_check_constraints = OFF');
+    const before = notes.connection().prepare('SELECT * FROM ai_period_summaries').all();
+    const changes = notes.connection().prepare('SELECT total_changes() AS total').get();
+    expect(() => periods.loadPeriodSummary('week', '2026-10-05')).toThrowError(
+      expect.objectContaining({ code: 'STORAGE' }),
+    );
+    expect(notes.connection().prepare('SELECT * FROM ai_period_summaries').all()).toEqual(before);
+    expect(notes.connection().prepare('SELECT total_changes() AS total').get()).toEqual(changes);
+  });
+
+  it.each([
+    [
+      '相同编号跨分点映射到不同手记',
+      [
+        [{ index: 1, noteId: 'note-a', title: '第一条手记' }],
+        [{ index: 1, noteId: 'note-b', title: '第二条手记' }],
+      ],
+    ],
+    [
+      '相同手记跨分点使用不同编号',
+      [
+        [{ index: 1, noteId: 'note-a', title: '原手记' }],
+        [{ index: 2, noteId: 'note-a', title: '原手记' }],
+      ],
+    ],
+  ])('%s 时保留损坏缓存并报 STORAGE', (_label, damagedSources) => {
+    const notes = open();
+    const periods = new PeriodSummaryStore(notes.connection());
+    periods.savePeriodSummary(summary({ summary: '- 第一项总结。\n- 第二项总结。' }));
+    notes
+      .connection()
+      .prepare('UPDATE ai_period_summaries SET point_sources = ?')
+      .run(JSON.stringify(damagedSources));
+    const before = notes.connection().prepare('SELECT * FROM ai_period_summaries').all();
+    expect(() => periods.loadPeriodSummary('week', '2026-10-05')).toThrowError(
+      expect.objectContaining({ code: 'STORAGE' }),
+    );
+    expect(notes.connection().prepare('SELECT * FROM ai_period_summaries').all()).toEqual(before);
+  });
+
+  it('七个分点及来源组的损坏缓存保留原文并报 STORAGE', () => {
+    const notes = open();
+    const periods = new PeriodSummaryStore(notes.connection());
+    periods.savePeriodSummary(summary());
+    const damagedSummary = Array.from({ length: 7 }, (_, index) => `- 分点 ${index + 1}`).join(
+      '\n',
+    );
+    const damagedSources = JSON.stringify(Array.from({ length: 7 }, () => []));
+    notes
+      .connection()
+      .prepare('UPDATE ai_period_summaries SET summary = ?, point_sources = ?')
+      .run(damagedSummary, damagedSources);
+    const before = notes.connection().prepare('SELECT * FROM ai_period_summaries').all();
+    expect(() => periods.loadPeriodSummary('week', '2026-10-05')).toThrowError(
+      expect.objectContaining({ code: 'STORAGE' }),
+    );
+    expect(notes.connection().prepare('SELECT * FROM ai_period_summaries').all()).toEqual(before);
   });
 
   it('重新生成原位更新同一周期，自然月和自然周即使起点相同也分别缓存', () => {
@@ -364,6 +586,7 @@ describe('周期总结 SQLite 缓存', () => {
     for (const assignment of [
       "period_type = 'year'",
       "suggestions = 'not-json'",
+      "point_sources = 'not-json'",
       'note_count = -1',
       'note_count = 1.5',
     ]) {
@@ -417,9 +640,80 @@ describe('周期总结 SQLite 缓存', () => {
         )
         .all(),
     ).toEqual(originalSchema);
-    const periods = new PeriodSummaryStore(current.connection());
-    periods.savePeriodSummary(summary());
-    expect(periods.loadPeriodSummary('week', '2026-10-05')).toEqual(summary());
+    const value = summary();
+    insertLegacySummary(current, value);
+    expect(current.connection().prepare('SELECT * FROM ai_period_summaries').get()).toEqual({
+      period_type: value.periodType,
+      start_date: value.startDate,
+      summary: value.summary,
+      suggestions: JSON.stringify(value.suggestions),
+      note_count: value.noteCount,
+      generated_at: value.generatedAt,
+    });
+  });
+
+  it('版本 8 升级保留原文缓存、手记、草稿、关系与自定义地址，不伪造来源', () => {
+    const previousMigrations = join(directory, 'version-8-migrations');
+    mkdirSync(previousMigrations);
+    for (const filename of readdirSync(migrationsDirectory).filter((name) =>
+      /^00[1-8]_/.test(name),
+    ))
+      copyFileSync(join(migrationsDirectory, filename), join(previousMigrations, filename));
+    const data = join(directory, 'version-8-data');
+    const previous = open(data, previousMigrations, 8);
+    const saved = note(previous, query.startAt, { body: '旧库的原始正文', tags: ['保留'] });
+    previous.saveDraft({ ...emptyDraft(randomUUID()), revision: 1, body: '旧库的未提交草稿' });
+    const topics = new TopicStore(previous.connection());
+    const topic = topics.create({ title: '旧版收录', description: '', confirmDuplicate: false });
+    topics.addNotes(topic.id, [saved.id]);
+    const settings = new AiSettingsStore(previous.connection());
+    settings.saveModel('deepseek-v4-pro');
+    settings.saveBaseUrl('https://existing-gateway.example.test/v1');
+    const value = summary();
+    insertLegacySummary(previous, value);
+    const originalCache = previous.connection().prepare('SELECT * FROM ai_period_summaries').get();
+    const snapshot = previous.load();
+    const configuration = settings.load();
+    close(previous);
+    const current = open(data);
+    expect(current.connection().prepare('PRAGMA user_version').get()?.user_version).toBe(
+      SCHEMA_VERSION,
+    );
+    expect(current.load()).toEqual(snapshot);
+    expect(new TopicStore(current.connection()).list()[0]?.noteIds).toEqual([saved.id]);
+    expect(new AiSettingsStore(current.connection()).load()).toEqual(configuration);
+    expect(current.connection().prepare('SELECT * FROM ai_period_summaries').get()).toEqual({
+      ...originalCache,
+      point_sources: null,
+    });
+    expect(
+      new PeriodSummaryStore(current.connection()).loadPeriodSummary('week', '2026-10-05'),
+    ).toEqual(value);
+  });
+
+  it('版本 8 备份在副本升级保留旧总结，原备份文件不被改写', async () => {
+    const previousMigrations = join(directory, 'backup-version-8-migrations');
+    mkdirSync(previousMigrations);
+    for (const filename of readdirSync(migrationsDirectory).filter((name) =>
+      /^00[1-8]_/.test(name),
+    ))
+      copyFileSync(join(migrationsDirectory, filename), join(previousMigrations, filename));
+    const data = join(directory, 'backup-version-8-data');
+    const previous = open(data, previousMigrations, 8);
+    note(previous, query.startAt, { body: '备份内的旧手记' });
+    insertLegacySummary(previous, summary());
+    const snapshot = previous.load();
+    const pack = join(directory, 'version-8-backup');
+    await backupLibrary(previous, new NoteImageStore(previous.connection(), data, 8), pack);
+    const before = readFileSync(join(pack, 'memocraft.sqlite'));
+    const target = join(directory, 'version-8-restored');
+    await restoreDatabaseBackup(pack, target, migrationsDirectory);
+    const restored = open(target);
+    expect(restored.load()).toEqual(snapshot);
+    expect(
+      new PeriodSummaryStore(restored.connection()).loadPeriodSummary('week', '2026-10-05'),
+    ).toEqual(summary());
+    expect(readFileSync(join(pack, 'memocraft.sqlite'))).toEqual(before);
   });
 
   it('整库备份与恢复包含周期缓存、原有内容和 AI 模型配置', async () => {

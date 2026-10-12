@@ -125,6 +125,8 @@ export interface StoredAiPeriodSummary {
   startDate: string;
   endDate: string;
   summary: string;
+  /** 按总结顶层分点排列的本地手记引用；旧缓存无此字段，空组表示该点无可跳转手记。 */
+  pointSources?: AiAnswerSource[][];
   suggestions: string[];
   noteCount: number;
   generatedAt: string;
@@ -175,6 +177,7 @@ export const AI_PERIOD_CONTEXT_LIMIT = 20;
 export const AI_PERIOD_CATEGORY_LIMIT = 5;
 export const AI_PERIOD_EXCERPT_LIMIT = 200;
 export const AI_PERIOD_SUMMARY_LIMIT = 600;
+export const AI_PERIOD_MAX_POINTS = 6;
 export const AI_PERIOD_MAX_SUGGESTIONS = 5;
 export const AI_PERIOD_SUGGESTION_MAX_LENGTH = 200;
 export const AI_PERIOD_MAX_IMAGES = 4;

@@ -94,6 +94,7 @@ async function mockReview(
                   message: {
                     content: JSON.stringify({
                       summary: input.summary,
+                      pointSources: input.pointSources,
                       suggestions: input.suggestions ?? [
                         '整理一份响应式访问方式的对照表。',
                         '用组件练习核对两种访问方式。',
@@ -130,7 +131,17 @@ async function mockReview(
         });
       };
     },
-    { ...options, summary: options.summary ?? summaryMarkdown(defaultPoints) },
+    {
+      ...options,
+      // 正常供应商结果遵守新的逐点契约；没有来源仍须显式携带同数量的空组。
+      summary: (options.summary ?? summaryMarkdown(defaultPoints)).startsWith('- ')
+        ? (options.summary ?? summaryMarkdown(defaultPoints))
+        : `- ${options.summary}`,
+      pointSources: (options.summary ?? summaryMarkdown(defaultPoints))
+        .split('\n')
+        .filter((line) => line.trim())
+        .map(() => [] as number[]),
+    },
   );
 }
 
@@ -540,7 +551,27 @@ test('真实桌面：回顾引导、自动生成、持久缓存、周期导航�
     await verifyThemedSummary(reopened, refreshedPoints);
     expect((await mockState(app))?.requests).toHaveLength(0);
 
-    await mockReview(app, { summary: '本月集中记录了 Vue 的响应式知识。可以继续整理访问规则。' });
+    // 旧版缓存可以是段落且没有逐点来源，不能用新供应商响应伪装兼容数据。
+    const monthStart = await reopened.evaluate(() => {
+      const today = new Date();
+      return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+    });
+    const legacyDatabase = new DatabaseSync(join(dataDirectory, 'memocraft.sqlite'));
+    try {
+      legacyDatabase
+        .prepare(
+          `INSERT INTO ai_period_summaries
+            (period_type, start_date, summary, suggestions, note_count, generated_at, point_sources)
+           VALUES ('month', ?, ?, '[]', 1, ?, NULL)`,
+        )
+        .run(
+          monthStart,
+          '本月集中记录了 Vue 的响应式知识。可以继续整理访问规则。',
+          new Date().toISOString(),
+        );
+    } finally {
+      legacyDatabase.close();
+    }
     await reopened.getByRole('tab', { name: '按月', exact: true }).click();
     await expect(reopened.getByRole('tab', { name: '按月', exact: true })).toHaveAttribute(
       'aria-selected',
@@ -552,7 +583,7 @@ test('真实桌面：回顾引导、自动生成、持久缓存、周期导航�
     await expect(reopened.locator('.summary-text > ul')).toHaveCount(0);
     await expect(reopened.locator('.period-trigger')).toHaveText(/^\d{4}年\d{1,2}月$/);
     const monthPeriods = await verifyPicker(reopened, 'month');
-    expect((await mockState(app))?.requests).toHaveLength(1);
+    expect((await mockState(app))?.requests).toHaveLength(0);
     expect(cacheRows(dataDirectory)).toHaveLength(2);
     await reopened.getByRole('button', { name: '深色', exact: true }).click();
     await expect(reopened.locator('html')).toHaveAttribute('data-theme', 'dark');
@@ -572,7 +603,7 @@ test('真实桌面：回顾引导、自动生成、持久缓存、周期导航�
     await expect(reopened.locator('.summary-text')).toContainText('本月集中记录');
     await choosePeriod(reopened, monthPeriods.previous);
     await expect(reopened.getByText('这段时间没有新手记。', { exact: true })).toBeVisible();
-    expect((await mockState(app))?.requests).toHaveLength(1);
+    expect((await mockState(app))?.requests).toHaveLength(0);
 
     // Markdown 只格式化文字：供应商原始 HTML、图片与危险链接都不能获得执行能力。
     await choosePeriod(reopened, monthPeriods.current);

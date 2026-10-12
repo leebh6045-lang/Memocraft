@@ -66,6 +66,7 @@ async function mockEndpoints(app: ElectronApplication): Promise<void> {
           kind = 'review';
           content = JSON.stringify({
             summary: '- **响应式访问**：本期记录明确区分 ref 与 reactive 的访问方式。',
+            pointSources: [[1]],
             suggestions: ['将两种访问方式整理成对照。'],
           });
         } else throw new Error('桌面验收收到未知 AI 业务请求');

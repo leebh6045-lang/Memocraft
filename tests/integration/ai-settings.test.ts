@@ -95,12 +95,29 @@ describe('AI 模型与接口地址 SQLite 配置', () => {
       noteCount: 1,
       generatedAt: '2026-10-11T04:00:00.000Z',
     };
-    new PeriodSummaryStore(previous.connection()).savePeriodSummary(summary);
+    // 旧模式只写入当时存在的列，不能让升级样例依赖最新版缓存存储实现。
+    previous
+      .connection()
+      .prepare(
+        `INSERT INTO ai_period_summaries
+          (period_type, start_date, summary, suggestions, note_count, generated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        summary.periodType,
+        summary.startDate,
+        summary.summary,
+        JSON.stringify(summary.suggestions),
+        summary.noteCount,
+        summary.generatedAt,
+      );
     const before = previous.load();
     close(previous);
 
     const current = open(data);
-    expect(current.connection().prepare('PRAGMA user_version').get()?.user_version).toBe(8);
+    expect(current.connection().prepare('PRAGMA user_version').get()?.user_version).toBe(
+      SCHEMA_VERSION,
+    );
     expect(current.load()).toEqual(before);
     expect(new TopicStore(current.connection()).list()[0]?.noteIds).toEqual([note.id]);
     expect(

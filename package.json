@@ -22,8 +22,10 @@
     "test:e2e": "playwright test",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
     "check:full": "pnpm check && pnpm typecheck:plain && pnpm build && pnpm test:runtime",
-    "package:dir": "pnpm build && electron-builder --dir",
-    "package:dmg": "pnpm build && electron-builder --mac dmg",
+    "clean:release": "node scripts/clean-release.mjs",
+    "package:dir": "pnpm clean:release && pnpm build && electron-builder --dir",
+    "package:dmg": "pnpm clean:release && pnpm build && electron-builder --mac dmg",
+    "package:win": "pnpm clean:release && pnpm build && electron-builder --win nsis",
     "test:runtime": "node scripts/run-runtime-smoke.mjs"
   },
   "dependencies": {

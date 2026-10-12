@@ -287,7 +287,6 @@ describe('搜索问答真实SQLite集成', () => {
       expect(call.baseUrl).toBe('https://ask-gateway.example.test/v1');
       return '{"answer":"记录涉及关系和事务。","sources":[1]}';
     }).ask({ requestId: randomUUID(), question: 'SQLite' });
-    expect(SCHEMA_VERSION).toBe(8);
     expect(databaseSnapshot()).toEqual(before);
     await service?.stopAndDrain();
     stores.notes.close();

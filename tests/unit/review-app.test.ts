@@ -7,6 +7,8 @@ import HomePage from '../../src/renderer/src/pages/HomePage.vue';
 import ReviewPage from '../../src/renderer/src/pages/ReviewPage.vue';
 import SettingsPage from '../../src/renderer/src/pages/SettingsPage.vue';
 import TrashPage from '../../src/renderer/src/pages/TrashPage.vue';
+import NoteDrawer from '../../src/renderer/src/components/NoteDrawer.vue';
+import ToastStack from '../../src/renderer/src/components/ToastStack.vue';
 import { disconnectedApi } from '../../src/renderer/src/api/bridge';
 import { emptyDraft, type Note } from '../../src/domain/note';
 import { localToday, periodRange } from '../../src/domain/time-range';
@@ -93,7 +95,7 @@ async function setup(configured = true) {
   Object.defineProperty(window, 'memocraft', { configurable: true, value: bridge });
   wrapper = shallowMount(App);
   await flushPromises();
-  return { app: wrapper, bridge, summary, close: () => closeRequested() };
+  return { app: wrapper, bridge, summary, note, close: () => closeRequested() };
 }
 // 普通 tsc 仅看到 Vue 文件入口声明；该 prop 的类型与正式页面契约一致。
 function reviewState(app: VueWrapper): ReviewState {
@@ -108,6 +110,43 @@ async function navigate(app: VueWrapper, label: string) {
 }
 
 describe('回顾 App 接线与知识库生命周期', () => {
+  it('只接受当前分点链接，打开真实手记抽屉并在关闭后保留回顾现场', async () => {
+    const { app, summary, note, bridge } = await setup();
+    summary.summary = '- **学习积累**：本期记录。';
+    summary.pointSources = [[{ index: 1, noteId: note.id, title: '学习记录' }]];
+    await navigate(app, '回顾');
+    const page = app.getComponent(ReviewPage);
+    page.vm.$emit('open-note', '不在当前来源里的ID');
+    await flushPromises();
+    expect(app.findComponent(NoteDrawer).exists()).toBe(false);
+    page.vm.$emit('open-note', note.id);
+    await flushPromises();
+    expect(app.getComponent(NoteDrawer).props('note')).toMatchObject({
+      id: note.id,
+      body: note.body,
+    });
+    expect(app.findComponent(ReviewPage).exists()).toBe(true);
+    app.getComponent(NoteDrawer).vm.$emit('close');
+    await flushPromises();
+    expect(app.findComponent(NoteDrawer).exists()).toBe(false);
+    expect(reviewState(app).summary.value).toEqual(summary);
+    expect(bridge.ai.summarizePeriod).toHaveBeenCalledTimes(1);
+  });
+
+  it('旧引用已不在当前有效手记中时明确提示，不打开过期正文', async () => {
+    const { app, summary } = await setup();
+    summary.summary = '- **学习积累**：原有记录。';
+    summary.pointSources = [[{ index: 1, noteId: '已删除手记', title: '旧标题' }]];
+    await navigate(app, '回顾');
+    app.getComponent(ReviewPage).vm.$emit('open-note', '已删除手记');
+    await flushPromises();
+    expect(app.findComponent(NoteDrawer).exists()).toBe(false);
+    expect(app.getComponent(ToastStack).props('toasts')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ message: '这条手记已不存在或已移到回收站。' }),
+      ]),
+    );
+  });
   it('只首次进入触发；四个快捷导航仍在原位，切页回来保持现场不重复请求', async () => {
     const { app, bridge } = await setup();
     expect(bridge.ai.summarizePeriod).not.toHaveBeenCalled();

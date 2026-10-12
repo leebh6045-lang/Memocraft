@@ -30,8 +30,9 @@ import { GIF_4X2, JPEG_6X7, PNG_2X3, WEBP_5X4 } from '../fixtures/images';
 
 const startDate = '2026-10-05';
 const defaultResponse = JSON.stringify({
-  summary: '本期积累了 SQLite 事务和索引实践。可以继续整理已有记录。',
+  summary: '- 本期积累了 SQLite 事务和索引实践。可以继续整理已有记录。',
   suggestions: ['检查超时待办，并补充 SQLite 归纳说明。'],
+  pointSources: [[1]],
 });
 let directory: string;
 let stores: StoreContext;
@@ -224,8 +225,9 @@ describe('周期总结真实 SQLite 业务链', () => {
     const beforeChanges = changes();
     complete.mockResolvedValueOnce(
       JSON.stringify({
-        summary: '本期有 SQLite 实践记录。可以结合已有归纳继续整理。',
+        summary: '- 本期有 SQLite 实践记录。可以结合已有归纳继续整理。',
         suggestions: ['检查 1 条超时待办。'],
+        pointSources: [[1]],
         noteCount: 999,
         periodType: 'month',
         generatedAt: '1900-01-01T00:00:00.000Z',
@@ -308,6 +310,82 @@ describe('周期总结真实 SQLite 业务链', () => {
     expect(changes()).toBe(beforeChanges);
   });
 
+  it('逐点链接按本地采样编号落缓存，无标题参与分析但不链接，删改手记不改写旧引用', async () => {
+    const first = note(
+      { title: '事务原理', body: '事务实践的真实内容。' },
+      localDateToUtcStart('2026-10-06'),
+    );
+    const second = note(
+      { title: '索引计划', body: '索引实践的真实内容。' },
+      localDateToUtcStart('2026-10-07'),
+    );
+    note(
+      { title: '', body: '未标题正文依旧参与本期分析。\n第二行不是链接标题。' },
+      localDateToUtcStart('2026-10-08'),
+    );
+    complete.mockResolvedValueOnce(
+      JSON.stringify({
+        summary: '- 事务与索引实践。\n- 索引有进一步积累。',
+        suggestions: [],
+        pointSources: [[3, 1, 2, 2, 999], [2]],
+        sources: [{ index: 2, noteId: randomUUID(), title: '供应商伪造标题' }],
+      }),
+    );
+    const firstResult = await service.summarize(input());
+    const pointSources = [
+      [
+        { index: 2, noteId: second.id, title: '索引计划' },
+        { index: 3, noteId: first.id, title: '事务原理' },
+      ],
+      [{ index: 2, noteId: second.id, title: '索引计划' }],
+    ];
+    expect(firstResult).toMatchObject({ noteCount: 3, pointSources });
+    expect(textContent(userContent())).toContain('未标题正文依旧参与本期分析。');
+    expect(
+      new PeriodSummaryStore(stores.notes.connection()).loadPeriodSummary('week', startDate),
+    ).toMatchObject({ summary: firstResult.summary, pointSources });
+    stores.notes.updateNote({
+      ...first,
+      expectedRevision: first.revision,
+      title: '后来修改的标题',
+    });
+    stores.notes.remove(second.id);
+    const beforeChanges = changes();
+    requests = [];
+    expect(await service.summarize(input())).toMatchObject({
+      noteCount: 3,
+      pointSources,
+      generatedAt: firstResult.generatedAt,
+    });
+    expect(complete).toHaveBeenCalledTimes(1);
+    expect(requests.map((operation) => operation.operation)).toEqual(['loadPeriodSummary']);
+    expect(changes()).toBe(beforeChanges);
+  });
+
+  it('旧版本单段缓存没有引用仍可读取，不为新增链接重生成或改写缓存', async () => {
+    note({ title: '已有手记' });
+    stores.notes
+      .connection()
+      .prepare(
+        `
+      INSERT INTO ai_period_summaries
+        (period_type, start_date, summary, suggestions, note_count, generated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `,
+      )
+      .run('week', startDate, '旧版本的单段回顾内容。', '[]', 1, currentTime.toISOString());
+    const before = businessSnapshot();
+    const beforeChanges = changes();
+    const result = await service.summarize(input());
+    expect(result.summary).toBe('旧版本的单段回顾内容。');
+    expect(result).not.toHaveProperty('pointSources');
+    expect(complete).not.toHaveBeenCalled();
+    expect(requests.map((operation) => operation.operation)).toEqual(['loadPeriodSummary']);
+    expect(cached()).toEqual(result);
+    expect(businessSnapshot()).toEqual(before);
+    expect(changes()).toBe(beforeChanges);
+  });
+
   it('编辑、删除和新增手记后旧缓存仍保持，用户主动重新生成才更新', async () => {
     const saved = note({ body: '初始记录' });
     note({ body: '保留记录', category: 'todo' });
@@ -319,7 +397,11 @@ describe('周期总结真实 SQLite 业务链', () => {
     expect(complete).toHaveBeenCalledTimes(1);
     currentTime = new Date('2026-10-11T05:00:00.000Z');
     complete.mockResolvedValueOnce(
-      JSON.stringify({ summary: '根据新增记录刷新了回顾。当前有效手记有两条。', suggestions: [] }),
+      JSON.stringify({
+        summary: '- 根据新增记录刷新了回顾。当前有效手记有两条。',
+        suggestions: [],
+        pointSources: [[1]],
+      }),
     );
     const regenerated = await service.summarize(input(true));
     expect(regenerated.summary).not.toBe(first.summary);
@@ -334,7 +416,7 @@ describe('周期总结真实 SQLite 业务链', () => {
     expect(complete).toHaveBeenCalledTimes(2);
   });
 
-  it.each(['format', 'network', 'cache-write'] as const)(
+  it.each(['format', 'sources', 'network', 'cache-write'] as const)(
     '重新生成发生 %s 失败时保留旧缓存及全部业务数据',
     async (kind) => {
       note();
@@ -342,11 +424,23 @@ describe('周期总结真实 SQLite 业务链', () => {
       const old = cached();
       currentTime = new Date('2026-10-11T05:00:00.000Z');
       if (kind === 'format') complete.mockResolvedValueOnce('不是 JSON');
+      if (kind === 'sources')
+        complete.mockResolvedValueOnce(
+          JSON.stringify({
+            summary: '- 第一主题\n- 第二主题',
+            suggestions: [],
+            pointSources: [[1]],
+          }),
+        );
       if (kind === 'network')
         complete.mockRejectedValueOnce(new AppError('AI_NETWORK', '测试网络失败。'));
       if (kind === 'cache-write') {
         complete.mockResolvedValueOnce(
-          JSON.stringify({ summary: '这份新摘要不应覆盖旧结果。', suggestions: [] }),
+          JSON.stringify({
+            summary: '- 这份新摘要不应覆盖旧结果。',
+            suggestions: [],
+            pointSources: [[1]],
+          }),
         );
         // 真正 SQLite 写入失败验证 UPSERT 的原子性，不通过替换存储依赖伪装失败。
         stores.notes.connection().exec(`
@@ -357,7 +451,12 @@ describe('周期总结真实 SQLite 业务链', () => {
       const before = businessSnapshot();
       const beforeChanges = changes();
       await expect(service.summarize(input(true))).rejects.toMatchObject({
-        code: kind === 'format' ? 'AI_RESPONSE' : kind === 'network' ? 'AI_NETWORK' : 'STORAGE',
+        code:
+          kind === 'format' || kind === 'sources'
+            ? 'AI_RESPONSE'
+            : kind === 'network'
+              ? 'AI_NETWORK'
+              : 'STORAGE',
       });
       expect(cached()).toEqual(old);
       expect(businessSnapshot()).toEqual(before);

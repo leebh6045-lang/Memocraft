@@ -1,6 +1,7 @@
 import type { DatabaseSync, SQLOutputValue } from 'node:sqlite';
 import { NOTE_CATEGORIES } from '../domain/note';
 import { isLocalDate, periodRange, type DateRange } from '../domain/time-range';
+import { isPeriodPointSources } from '../domain/period-summary';
 import {
   AI_PERIOD_MAX_SUGGESTIONS,
   AI_PERIOD_SUGGESTION_MAX_LENGTH,
@@ -59,14 +60,17 @@ function summaryFromRow(row: DatabaseRow): StoredAiPeriodSummary {
   const generatedAt = stringField(row, 'generated_at');
   const noteCount = countField(row, 'note_count');
   let suggestions: unknown;
+  let pointSources: unknown;
   try {
     suggestions = JSON.parse(stringField(row, 'suggestions'));
+    if (row.point_sources !== null) pointSources = JSON.parse(stringField(row, 'point_sources'));
   } catch {
     // 损坏缓存不能伪装成未命中，更不能静默删除；保留数据供用户恢复。
     throw invalidCache();
   }
   if (
     !summary.trim() ||
+    (pointSources !== undefined && !isPeriodPointSources(pointSources, summary)) ||
     summary.length > AI_PERIOD_SUMMARY_LIMIT + 1 ||
     noteCount === 0 ||
     !validGeneratedAt(generatedAt) ||
@@ -83,6 +87,7 @@ function summaryFromRow(row: DatabaseRow): StoredAiPeriodSummary {
     startDate,
     endDate: range.endDate,
     summary,
+    ...(pointSources !== undefined ? { pointSources } : {}),
     suggestions,
     noteCount,
     generatedAt,
@@ -181,11 +186,12 @@ export class PeriodSummaryStore {
       .prepare(
         `
         INSERT INTO ai_period_summaries
-          (period_type, start_date, summary, suggestions, note_count, generated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+          (period_type, start_date, summary, suggestions, note_count, generated_at, point_sources)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (period_type, start_date) DO UPDATE SET
           summary = excluded.summary, suggestions = excluded.suggestions,
-          note_count = excluded.note_count, generated_at = excluded.generated_at
+          note_count = excluded.note_count, generated_at = excluded.generated_at,
+          point_sources = excluded.point_sources
       `,
       )
       .run(
@@ -195,6 +201,7 @@ export class PeriodSummaryStore {
         JSON.stringify(summary.suggestions),
         summary.noteCount,
         summary.generatedAt,
+        summary.pointSources === undefined ? null : JSON.stringify(summary.pointSources),
       );
   }
 }

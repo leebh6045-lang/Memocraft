@@ -1,6 +1,16 @@
 appId: app.memocraft.desktop
 productName: Memocraft
 icon: resources/brand/memocraft-app-icon.png
+# Electron 二进制与校验和改从国内镜像取（顶层配置项，不能放进 win 段）。
+# GitHub 的 release 资产在国内经常被限速到 100KB/s 级别，158MB 的包会直接撞上
+# electron-builder 的 10 分钟单请求超时；镜像上的校验和与官方 SHASUMS256.txt
+# 逐字节一致，完整性不受影响。
+electronDownload:
+  mirror: https://registry.npmmirror.com/-/binary/electron/
+# 需要跳过联网下载与校验的构建机（Windows）在打包命令上临时指定本地 Electron 目录，
+# 不把本机路径写进本文件——写进来会让其他机器（macOS 打包）直接报 electronDist 不存在：
+#   pnpm run package:win -c.electronDist=D:/Appout/.cache/electron/electron-v44.4.3-win32-x64
+# 目录名与 zip 名必须与 electron-builder 的默认预期一致：<目录>/electron-v<版本>-<平台>-<架构>.zip
 directories:
   output: release
 files:
@@ -22,4 +32,17 @@ mac:
   # 本机自用：不做 Developer ID 签名与公证，首次打开需要手动允许。
   identity: null
 win:
-  target: nsis
+  target:
+    - nsis
+  # 与 mac 段保持同一套命名：产品名-版本-架构，便于分发与排障。
+  # 不加这一行，NSIS 默认会产出带空格的「Memocraft Setup 0.2.0.exe」。
+  artifactName: ${productName}-${version}-${arch}.${ext}
+# NSIS 选项是顶层配置（不是 win 的子项，放错会直接配置校验失败）。
+# electron-builder 默认 oneClick=true，即一键静默安装：不渲染向导，因此没有选择
+# 安装路径的机会。下面两项把它改成向导式安装，并插入「选择安装位置」页面。
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  # 保持每用户安装：不需要管理员权限、不弹 UAC。代价是无法装进 Program Files，
+  # 想全局安装需改成 true（届时会要求提权）。
+  perMachine: false

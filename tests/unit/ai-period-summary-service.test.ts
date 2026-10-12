@@ -66,7 +66,8 @@ function fixture(model: AiModel = 'deepseek-flash') {
   });
   const client = {
     complete: vi.fn<DeepSeekClient['complete']>(
-      async () => '{"summary":"本期学习 Vue。","suggestions":["确认三条超时待办。"]}',
+      async () =>
+        '{"summary":"- 本期学习 Vue。","suggestions":["确认三条超时待办。"],"pointSources":[[1]]}',
     ),
   };
   const context = vi.fn(async () => ({
@@ -99,10 +100,18 @@ describe('周期总结采样与输出', () => {
     for (const category of ['insight', 'todo', 'done', 'misc'])
       expect(result.filter((item) => item.category === category)).toHaveLength(5);
   });
-  it('摘要超长只截断并附省略号，空建议数组合法', () => {
+  it('单点摘要超长只截断并附省略号，同时保留该点来源，空建议数组合法', () => {
+    const source = note();
     expect(
-      parsePeriodResponse(JSON.stringify({ summary: '字'.repeat(601), suggestions: [] })),
-    ).toEqual({ summary: `${'字'.repeat(600)}…`, suggestions: [] });
+      parsePeriodResponse(
+        JSON.stringify({ summary: `- ${'字'.repeat(601)}`, suggestions: [], pointSources: [[1]] }),
+        [source],
+      ),
+    ).toEqual({
+      summary: `- ${'字'.repeat(598)}…`,
+      suggestions: [],
+      pointSources: [[{ index: 1, noteId: source.id, title: source.title }]],
+    });
   });
   it.each([
     'not json',
@@ -110,15 +119,94 @@ describe('周期总结采样与输出', () => {
     '{}',
     '{"summary":" ","suggestions":[]}',
     '{"summary":4,"suggestions":[]}',
-    '{"summary":"概要","suggestions":{}}',
-    '{"summary":"概要","suggestions":[1]}',
-    '{"summary":"概要","suggestions":[""]}',
-    JSON.stringify({ summary: '概要', suggestions: Array(6).fill('建议') }),
-    JSON.stringify({ summary: '概要', suggestions: ['字'.repeat(201)] }),
+    '{"summary":"- 概要","suggestions":{},"pointSources":[[]]}',
+    '{"summary":"- 概要","suggestions":[1],"pointSources":[[]]}',
+    '{"summary":"- 概要","suggestions":[""],"pointSources":[[]]}',
+    JSON.stringify({ summary: '- 概要', suggestions: Array(6).fill('建议'), pointSources: [[]] }),
+    JSON.stringify({ summary: '- 概要', suggestions: ['字'.repeat(201)], pointSources: [[]] }),
   ])('格式或结构越界整份拒绝 %s', (content) => {
     expect(() => parsePeriodResponse(content)).toThrow(
       expect.objectContaining({ code: 'AI_RESPONSE' }),
     );
+  });
+  it('引用只映射本次候选的真实 ID 与标题，过滤范围外编号并去重升序', () => {
+    const notes = [note(1), note(2), note(3)];
+    expect(
+      parsePeriodResponse(
+        JSON.stringify({
+          summary: '- 第一主题\n- 第二主题',
+          suggestions: [],
+          pointSources: [[3, 1, 3, 99, 0, -1], [2]],
+          sources: [{ index: 1, noteId: '模型伪造 ID', title: '模型伪造标题' }],
+        }),
+        notes,
+      ),
+    ).toEqual({
+      summary: '- 第一主题\n- 第二主题',
+      suggestions: [],
+      pointSources: [
+        [
+          { index: 1, noteId: '001', title: '主题1' },
+          { index: 3, noteId: '003', title: '主题3' },
+        ],
+        [{ index: 2, noteId: '002', title: '主题2' }],
+      ],
+    });
+  });
+  it('无标题与纯空白标题不形成链接，仍保持各点的对应位置', () => {
+    const notes = [
+      { ...note(1), title: '', body: '首行内容不能替代链接标题。\n正文第二行' },
+      { ...note(2), title: ' \n\t ' },
+      note(3),
+    ];
+    expect(
+      parsePeriodResponse(
+        JSON.stringify({
+          summary: '- 未标题积累\n- 有标题积累',
+          suggestions: [],
+          pointSources: [
+            [1, 2],
+            [1, 3],
+          ],
+        }),
+        notes,
+      ).pointSources,
+    ).toEqual([[], [{ index: 3, noteId: '003', title: '主题3' }]]);
+  });
+  it.each([
+    { summary: '旧单段概要', pointSources: [[]] },
+    { summary: '- 概要' },
+    { summary: '- 概要', pointSources: null },
+    { summary: '- 概要', pointSources: [1] },
+    { summary: '- 概要', pointSources: [['1']] },
+    { summary: '- 概要', pointSources: [[1.5]] },
+    { summary: '- 概要', pointSources: [[null]] },
+    { summary: '- 概要', pointSources: [[{ index: 1 }]] },
+    { summary: '- 概要', pointSources: [Array(21).fill(1)] },
+    { summary: '- 概要', pointSources: [] },
+    { summary: '- 概要', pointSources: [[], []] },
+    { summary: '- 一\n- 二', pointSources: [[]] },
+    { summary: '- 一\n  续行', pointSources: [[]] },
+    { summary: '- 一\n正文段落', pointSources: [[]] },
+    { summary: Array(7).fill('- 要点').join('\n'), pointSources: Array(7).fill([]) },
+  ])('新生成结果拒绝非列表、非法编号或分点错位 %j', (response) => {
+    expect(() =>
+      parsePeriodResponse(JSON.stringify({ suggestions: [], ...response }), [note()]),
+    ).toThrow(expect.objectContaining({ code: 'AI_RESPONSE' }));
+  });
+  it('截断后的正文和来源同步保留，不能把下点链接挂到前一点', () => {
+    const first = `- ${'字'.repeat(598)}`;
+    const parsed = parsePeriodResponse(
+      JSON.stringify({
+        summary: `${first}\n- 第二主题`,
+        suggestions: [],
+        pointSources: [[1], [2]],
+      }),
+      [note(1), note(2)],
+    );
+    expect(parsed.summary).toBe(first);
+    expect(parsed.summary.length).toBeLessThanOrEqual(601);
+    expect(parsed.pointSources).toEqual([[{ index: 1, noteId: '001', title: '主题1' }]]);
   });
   it('首次生成统计/日期由本地提供，只发送200字摘录；缓存命中不发网络', async () => {
     const { service, client, request, cache, data } = fixture();
@@ -131,6 +219,7 @@ describe('周期总结采样与输出', () => {
       startDate: '2026-10-05',
       endDate: '2026-10-11',
       generatedAt: '2026-10-11T12:00:00.000Z',
+      pointSources: [[{ index: 1, noteId: firstNote.id, title: firstNote.title }]],
     });
     const prompt = client.complete.mock.calls[0]?.[0];
     expect(prompt?.messages[1]?.content).toContain(JSON.stringify(firstNote.body.slice(0, 200)));
@@ -151,6 +240,35 @@ describe('周期总结采样与输出', () => {
     );
     await service.summarize(input(true));
     expect(client.complete).toHaveBeenCalledTimes(1);
+  });
+  it('未标题手记仍参与 AI 分析，其编号被引用时不会生成正文替代标题的链接', async () => {
+    const f = fixture();
+    f.data.notes = [{ ...note(0), title: ' \t', body: '本期有价值的未标题内容。\n后续说明' }];
+    const result = await f.service.summarize(input());
+    expect(result.noteCount).toBe(1);
+    expect(result.pointSources).toEqual([[]]);
+    expect(f.client.complete.mock.calls[0]?.[0].messages[1]?.content).toContain(
+      '本期有价值的未标题内容。',
+    );
+    expect(f.cache()?.pointSources).toEqual([[]]);
+  });
+  it('旧缓存没有逐点来源仍直接读取，不为补链接重生成或写入', async () => {
+    const f = fixture();
+    const legacy: StoredAiPeriodSummary = {
+      periodType: 'week',
+      startDate: '2026-10-05',
+      endDate: '2026-10-11',
+      summary: '旧版本生成的单段回顾。',
+      suggestions: [],
+      noteCount: 1,
+      generatedAt: '2026-10-10T12:00:00.000Z',
+    };
+    f.request.mockImplementation(async () => success(legacy));
+    expect(await f.service.summarize(input())).toEqual(legacy);
+    expect(f.client.complete).not.toHaveBeenCalled();
+    expect(f.request.mock.calls.map(([request]) => request.operation)).toEqual([
+      'loadPeriodSummary',
+    ]);
   });
   it('未配置优先于缓存/空期；空期不调用模型、不写缓存', async () => {
     const f = fixture();
@@ -192,7 +310,7 @@ describe('周期总结采样与输出', () => {
     f.data.notes = Array.from({ length: 21 }, (_, i) => note(i));
     f.data.total = 21;
     f.client.complete.mockResolvedValueOnce(
-      '{"summary":"概要","suggestions":[],"noteCount":999,"startDate":"2030-01-01"}',
+      '{"summary":"- 概要","suggestions":[],"pointSources":[[1]],"noteCount":999,"startDate":"2030-01-01"}',
     );
     expect(await f.service.summarize(input())).toMatchObject({
       noteCount: 21,
@@ -240,6 +358,7 @@ describe('回顾提示词约束', () => {
     expect(rules).toContain('只输出 JSON');
     expect(rules).toContain('"summary"');
     expect(rules).toContain('"suggestions"');
+    expect(rules).toContain('"pointSources"');
     expect(call).toMatchObject({ model: 'deepseek-flash', maxTokens: 1024 });
     expect(call).not.toHaveProperty('timeoutMs');
     expect(call?.messages).toHaveLength(2);
@@ -257,6 +376,7 @@ describe('回顾提示词约束', () => {
       summary:
         '- **组件边界：核心积累**：本期重点是明确组件状态边界。记录说明了输入与修改责任。\n- **命令备忘**：另有一条 git status 记录。',
       suggestions: ['确认三条超时待办。'],
+      pointSources: [[2], [1]],
     };
     f.client.complete.mockResolvedValueOnce(JSON.stringify(output));
     const result = await f.service.summarize(input());
@@ -267,10 +387,15 @@ describe('回顾提示词约束', () => {
     expect(content).toContain('git status');
     expect(content).toContain('超时待办（7 天以上未处理）：3 条');
     expect(content).toContain('收录了 5 条本期手记');
-    expect(result).toMatchObject({ ...output, noteCount: 2 });
+    const pointSources = [
+      [{ index: 2, noteId: '000', title: '组件边界分析' }],
+      [{ index: 1, noteId: '001', title: '命令备忘' }],
+    ];
+    expect(result).toMatchObject({ ...output, pointSources, noteCount: 2 });
     expect(result.suggestions).toHaveLength(1);
     expect(f.cache()).toEqual({
       ...output,
+      pointSources,
       noteCount: 2,
       periodType: 'week',
       startDate: '2026-10-05',
@@ -388,7 +513,7 @@ describe('周期图片与取消排空', () => {
     expect(() => f.service.summarize(input())).toThrow(
       expect.objectContaining({ code: 'UNAVAILABLE' }),
     );
-    pending.resolve('{"summary":"迟到概要","suggestions":[]}');
+    pending.resolve('{"summary":"- 迟到概要","suggestions":[],"pointSources":[[1]]}');
     await drain;
     for (const result of await Promise.all([first, second, third]))
       expect(result).toMatchObject({ code: 'AI_CANCELLED' });
@@ -403,7 +528,7 @@ describe('周期图片与取消排空', () => {
     const flight = f.service.summarize(input());
     await vi.waitFor(() => expect(f.client.complete).toHaveBeenCalled());
     await f.service.cancel(randomUUID());
-    pending.resolve('{"summary":"有效概要","suggestions":[]}');
-    await expect(flight).resolves.toMatchObject({ summary: '有效概要' });
+    pending.resolve('{"summary":"- 有效概要","suggestions":[],"pointSources":[[1]]}');
+    await expect(flight).resolves.toMatchObject({ summary: '- 有效概要' });
   });
 });

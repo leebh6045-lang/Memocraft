@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { isoWeekNumber } from '../../../domain/time-range';
+import { splitPeriodSummaryPoints } from '../../../domain/period-summary';
 import type { AiPeriodType } from '../../../shared/ai';
 import type { ReviewState } from '../composables/useReview';
 import { formatFullTime, formatTime } from '../format-time';
@@ -8,7 +9,7 @@ import { renderMarkdown } from '../markdown';
 import ReviewPeriodPicker from '../components/ReviewPeriodPicker.vue';
 
 const props = defineProps<{ state: ReviewState; busy?: boolean }>();
-const emit = defineEmits<{ navigate: [target: 'settings'] }>();
+const emit = defineEmits<{ navigate: [target: 'settings']; 'open-note': [noteId: string] }>();
 // 取消归父层导航与作用域负责，避免 out-in 过渡里旧页面卸载取消新一轮请求。
 const { phase, periodType, startDate, endDate, summary, error, errorCode, availablePeriods } =
   props.state;
@@ -18,6 +19,16 @@ const contentHost = ref<HTMLElement>();
 const actionBusy = computed(() => props.busy || props.state.busy.value);
 // 复用关闭 HTML、图片和链接的渲染器；展示主题分点与加粗标题，也兼容已有段落缓存。
 const summaryHtml = computed(() => renderMarkdown(summary.value?.summary ?? ''));
+const summaryPoints = computed(() => {
+  const current = summary.value;
+  if (!current?.pointSources) return null;
+  const points = splitPeriodSummaryPoints(current.summary);
+  if (!points || points.length !== current.pointSources.length) return null;
+  return points.map((text, index) => ({
+    html: renderMarkdown(text),
+    sources: current.pointSources?.[index] ?? [],
+  }));
+});
 const periodKey = computed(() => `${periodType.value}:${startDate.value}`);
 // 刷新时保留原正文；新结果、周期和空/错误状态各自完整过渡，快速缓存命中跳过中间帧。
 const contentKey = computed(() => {
@@ -27,6 +38,12 @@ const contentKey = computed(() => {
   return `${periodKey.value}:${content}`;
 });
 let heightChanging = false;
+
+/** 焦点提前显现的块在本轮内容树内保持清晰，移入抽屉或失焦时不能重新启动凝结。 */
+function revealFocusedBlock(event: FocusEvent): void {
+  if (!(event.target instanceof Element)) return;
+  event.target.closest('.review-reveal')?.classList.add('is-revealed');
+}
 
 function reducedMotion(): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -185,6 +202,7 @@ function tabKeydown(event: KeyboardEvent): void {
         aria-live="polite"
         @transitionend.self="finishContentHeight"
         @transitioncancel.self="finishContentHeight"
+        @focusin="revealFocusedBlock"
       >
         <Transition
           name="review-content"
@@ -236,9 +254,44 @@ function tabKeydown(event: KeyboardEvent): void {
             <template v-if="summary">
               <section class="review-section">
                 <h2 class="review-section-title review-reveal">总结</h2>
-                <!-- 仅插入 renderMarkdown 的安全输出，原始 HTML、链接与图片均不执行。 -->
-                <!-- eslint-disable-next-line vue/no-v-html -->
-                <div class="review-summary-text summary-text review-reveal" v-html="summaryHtml" />
+                <div v-if="summaryPoints" class="review-summary-text summary-text review-reveal">
+                  <ul class="review-summary-points">
+                    <li
+                      v-for="(point, index) in summaryPoints"
+                      :key="index"
+                      class="review-summary-point"
+                    >
+                      <!-- 正文只使用安全 Markdown；本地手记链接独立渲染，不接受模型 URL。 -->
+                      <!-- eslint-disable-next-line vue/no-v-html -->
+                      <div class="review-point-text" v-html="point.html" />
+                      <ul
+                        v-if="point.sources.length"
+                        class="review-point-notes"
+                        :aria-label="`第 ${index + 1} 点的相关手记`"
+                      >
+                        <li v-for="source in point.sources" :key="source.noteId">
+                          <button
+                            type="button"
+                            class="review-note-link"
+                            :data-note-id="source.noteId"
+                            :disabled="props.busy"
+                            @click="emit('open-note', source.noteId)"
+                          >
+                            {{ source.title }}
+                          </button>
+                        </li>
+                      </ul>
+                    </li>
+                  </ul>
+                </div>
+                <!-- 旧缓存没有逐点引用，保持原文，不猜造链接或强行拆段。 -->
+                <!-- eslint-disable vue/no-v-html -->
+                <div
+                  v-else
+                  class="review-summary-text summary-text review-reveal"
+                  v-html="summaryHtml"
+                />
+                <!-- eslint-enable vue/no-v-html -->
               </section>
               <template v-if="summary.suggestions.length">
                 <div
@@ -367,8 +420,8 @@ function tabKeydown(event: KeyboardEvent): void {
 .page-leave-active .review-reveal {
   animation-play-state: paused;
 }
-/* 键盘先进入尚未显现的按钮时立即清晰，避免焦点落在透明内容上。 */
-.review-reveal:focus-within {
+/* 获得焦点即结束本块入场，标记随内容树保留；新周期/结果的节点仍正常凝结。 */
+.review-reveal.is-revealed {
   animation: none;
 }
 @keyframes review-condense-opacity {
@@ -391,9 +444,9 @@ function tabKeydown(event: KeyboardEvent): void {
   }
 }
 .review-section-title {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--muted);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
   margin-bottom: 14px;
 }
 .review-suggestions li {
@@ -422,6 +475,33 @@ function tabKeydown(event: KeyboardEvent): void {
 }
 .summary-text :deep(strong) {
   font-weight: 600;
+}
+.summary-text .review-point-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 8px;
+  padding: 0;
+  list-style: none;
+}
+.summary-text .review-point-notes li + li {
+  margin-top: 0;
+}
+.review-note-link {
+  padding: 2px 0;
+  color: var(--accent);
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--dur-1) ease;
+}
+.review-note-link:hover,
+.review-note-link:focus-visible {
+  text-decoration-color: currentColor;
 }
 .summary-meta {
   display: flex;

@@ -355,6 +355,45 @@ async function openAnswerSource(noteId: string) {
   else announce('这条来源手记已不在当前列表中，请重新搜索。');
 }
 
+/** 回顾只打开当前分点白名单内仍有效的手记；抽屉关闭后保留周期与回顾现场。 */
+let reviewSourceOrigin: { noteId: string; element: HTMLElement | null } | null = null;
+async function openReviewSource(noteId: string) {
+  if (
+    page.value !== 'review' ||
+    busy.value ||
+    !review.summary.value?.pointSources?.some((group) =>
+      group.some((source) => source.noteId === noteId),
+    )
+  )
+    return;
+  if (!notes.value.some((note) => note.id === noteId)) {
+    announce('这条手记已不存在或已移到回收站。');
+    return;
+  }
+  const element = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  await openNote(noteId);
+  if (editing.value?.id === noteId) reviewSourceOrigin = { noteId, element };
+}
+
+watch(editing, async (current) => {
+  if (current || !reviewSourceOrigin) return;
+  const origin = reviewSourceOrigin;
+  reviewSourceOrigin = null;
+  await nextTick();
+  // 生成回包可能重建背景按钮；原入口还在时沿用模态焦点，失效时定位新树的同一手记。
+  if (
+    page.value !== 'review' ||
+    (origin.element?.isConnected && !origin.element.closest('[inert]'))
+  )
+    return;
+  const target = Array.from(
+    main.value?.querySelectorAll<HTMLButtonElement>('.review-note-link') ?? [],
+  ).find((button) => button.dataset.noteId === origin.noteId && !button.closest('[inert]'));
+  (target ?? main.value?.querySelector<HTMLElement>('.review-page h1'))?.focus({
+    preventScroll: true,
+  });
+});
+
 async function closeDrawer() {
   if (busy.value || searchOpen.value) return;
   if (!(await library.closeNote())) banner.value = '手记尚未保存，编辑内容仍保留。';
@@ -847,6 +886,7 @@ onBeforeUnmount(() => {
           :state="review"
           :busy="busy"
           @navigate="navigate($event, 'ai')"
+          @open-note="openReviewSource"
         />
         <PlannedModule v-else :key="page" :module="page" />
       </Transition>
