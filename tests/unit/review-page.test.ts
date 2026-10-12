@@ -287,6 +287,70 @@ describe('回顾页面', () => {
     expect(wrapper.get('.summary-text').text()).toContain('<https://example.invalid>');
   });
 
+  it('逐点正文与手记链接独立呈现，不显示来源字样或空链接列表', async () => {
+    const state = makeState();
+    state.summary.value = {
+      ...summary,
+      summary: '- **网络原理**：本期主要积累。\n- **零散记录**：仍参与分析。',
+      pointSources: [[{ index: 1, noteId: 'note-network', title: '<b>网络原理</b>' }], []],
+    };
+    const { wrapper } = render(state);
+    const points = wrapper.findAll('.review-summary-points > .review-summary-point');
+    expect(points).toHaveLength(2);
+    expect(points[0]?.get('.review-point-text').text()).toBe('网络原理：本期主要积累。');
+    expect(points[0]?.get('.review-note-link').text()).toBe('<b>网络原理</b>');
+    expect(points[0]?.find('.review-note-link b').exists()).toBe(false);
+    expect(points[1]?.find('.review-point-notes').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('来源');
+    await wrapper.get('.review-note-link').trigger('click');
+    expect(wrapper.emitted('open-note')).toEqual([['note-network']]);
+    await wrapper.setProps({ busy: true });
+    expect(wrapper.get('.review-note-link').attributes('disabled')).toBeDefined();
+  });
+
+  it('逐点模式仍关闭正文HTML、图片和模型链接，只有独立本地按钮可跳转', () => {
+    const state = makeState();
+    state.summary.value = {
+      ...summary,
+      summary:
+        '- **记录**：<script>alert(1)</script> [伪链接](javascript:alert(1)) ![图](https://example.test/a.png)',
+      pointSources: [[{ index: 1, noteId: 'note-safe', title: '真实本地手记' }]],
+    };
+    const { wrapper } = render(state);
+    expect(
+      wrapper
+        .find('.review-point-text script, .review-point-text a, .review-point-text img')
+        .exists(),
+    ).toBe(false);
+    expect(wrapper.get('.review-point-text').text()).toContain('<script>');
+    expect(wrapper.findAll('.review-note-link')).toHaveLength(1);
+  });
+
+  it('焦点提前显现的正文保持清晰，移走和重新进入不重置，新结果使用新入场块', async () => {
+    const state = makeState();
+    state.summary.value = {
+      ...summary,
+      summary: '- **网络原理**：本期学习积累。',
+      pointSources: [[{ index: 1, noteId: 'note-network', title: '网络原理' }]],
+    };
+    const { wrapper } = render(state);
+    const block = wrapper.get('.review-summary-text');
+    const link = wrapper.get<HTMLButtonElement>('.review-note-link');
+    expect(block.classes()).not.toContain('is-revealed');
+    link.element.focus();
+    await wrapper.vm.$nextTick();
+    expect(block.classes()).toContain('is-revealed');
+    wrapper.get<HTMLElement>('h1').element.focus();
+    await wrapper.vm.$nextTick();
+    expect(block.classes()).toContain('is-revealed');
+    link.element.focus();
+    expect(block.classes()).toContain('is-revealed');
+    state.summary.value = { ...state.summary.value, generatedAt: '2026-10-11T05:00:00.000Z' };
+    await wrapper.vm.$nextTick();
+    expect(wrapper.get('.review-summary-text').element).not.toBe(block.element);
+    expect(wrapper.get('.review-summary-text').classes()).not.toContain('is-revealed');
+  });
+
   it('loading 显示带状态语义的骨架；empty 和未配置没有骨架或加载行', async () => {
     const state = makeState();
     state.phase.value = 'loading';

@@ -47,12 +47,12 @@ interface MotionFrame {
   entering: boolean;
 }
 
-// 文本接近常用行宽边界，最小窗口能实际增加换行，无须改写页面 DOM 或布局。
-const longWeekSummary = `周回顾：${'响应式访问、事务原子性与分类事实帮助整理学习积累，'.repeat(18)}这些主题来自本期手记。可以继续用实践巩固这些知识。`;
-const longSuggestions = Array.from(
-  { length: 5 },
-  (_, index) =>
-    `建议 ${index + 1}：${'整理响应式访问和事务练习的事实，逐条对照手记并补充归纳说明，'.repeat(5)}`,
+// 中英混合正文和建议接近列表缩进后的行宽边界，最小窗口能实际增加换行。
+const longWeekSummary = `周回顾：${'Vue 的 ref 与 reactive 访问、SQLite 的事务原子性、手记分类与归纳边界帮助整理学习积累。'.repeat(9)}这些主题来自本期手记。可以继续用实践巩固这些知识。`;
+const longSuggestions = Array.from({ length: 5 }, (_, index) =>
+  `将响应式访问与事务原子性的实践事实逐条对照手记补充归纳说明检查已有结论并继续整理学习记录核验${index + 1}`.repeat(
+    4,
+  ),
 );
 const shortMonthSummary = '月回顾：本月记录了响应式知识。可以继续整理已经完成的练习。';
 
@@ -100,7 +100,8 @@ async function mockNetwork(
                 {
                   message: {
                     content: JSON.stringify({
-                      summary: options.summary,
+                      summary: `- ${options.summary}`,
+                      pointSources: [[]],
                       suggestions: options.suggestions,
                     }),
                   },
@@ -169,7 +170,10 @@ async function warmCache(
     },
     { requestId: randomUUID(), periodType },
   );
-  expect(result).toMatchObject({ ok: true, value: { periodType, summary, noteCount: 1 } });
+  expect(result).toMatchObject({
+    ok: true,
+    value: { periodType, summary: `- ${summary}`, pointSources: [[]], noteCount: 1 },
+  });
   expect(await networkState(app)).toHaveLength(1);
 }
 
@@ -596,7 +600,7 @@ test('真实桌面：周期动效不阻塞取消，减少动态效果立即切�
     await expect(page.locator('.summary-text')).toHaveText(longWeekSummary);
     await expect(page.locator('.review-content')).not.toContainText('迟到的旧月回顾');
     expect(persistedSummaries(dataDirectory)).toEqual([
-      { period_type: 'week', summary: longWeekSummary },
+      { period_type: 'week', summary: `- ${longWeekSummary}` },
     ]);
 
     await warmCache(app, page, 'month', shortMonthSummary);

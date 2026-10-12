@@ -19,6 +19,7 @@ import { NOTE_MAX_TAGS, NOTE_TAG_MAX_LENGTH } from '../domain/note';
 import { MAX_NOTE_IMAGE_COUNT } from '../domain/note-image';
 import { AppError } from '../shared/errors';
 import { normalizeAiBaseUrl } from '../domain/ai-endpoint';
+import { isPeriodPointSources } from '../domain/period-summary';
 
 /** IPC 与数据库返回均须确认模型在当前白名单内，不能传任意供应商模型。 */
 export function validateAiModel(value: unknown): AiModel {
@@ -217,10 +218,14 @@ export function validateStoredPeriodSummary(value: unknown): StoredAiPeriodSumma
       throw new AppError('VALIDATION', '回顾建议内容无效，原结果未被替换。');
     suggestions.push(item);
   }
+  const pointSources = 'pointSources' in value ? value.pointSources : undefined;
+  if (pointSources !== undefined && !isPeriodPointSources(pointSources, value.summary))
+    throw new AppError('VALIDATION', '回顾手记链接无效，原结果未被替换。');
   return {
     ...key,
     endDate: value.endDate,
     summary: value.summary,
+    ...(pointSources !== undefined ? { pointSources } : {}),
     suggestions,
     noteCount: value.noteCount,
     generatedAt: value.generatedAt,
