@@ -2,10 +2,14 @@ import { parentPort, workerData } from 'node:worker_threads';
 import { NoteStore } from '../../storage/note-store';
 import { NoteImageStore } from '../../storage/note-image-store';
 import { TopicStore } from '../../storage/topic-store';
+import { TagStore } from '../../storage/tag-store';
 import { ThreadStore } from '../../storage/thread-store';
 import { SearchStore } from '../../storage/search-store';
+import { NoteSearchStore } from '../../storage/note-search-store';
 import { TrashStore } from '../../storage/trash-store';
 import { ExportStore } from '../../storage/export-store';
+import { AiSettingsStore } from '../../storage/ai-settings-store';
+import { PeriodSummaryStore } from '../../storage/period-summary-store';
 import { SCHEMA_VERSION } from '../../storage/schema';
 import { executeStoreRequest, type StoreContext } from '../../services/note-service';
 import type { WorkerReply, WorkerRequest } from '../../shared/contracts';
@@ -32,10 +36,14 @@ const migrationsDirectory = workerData.migrationsDirectory as string;
 let store: NoteStore | null = null;
 let images: NoteImageStore | null = null;
 let topics: TopicStore | null = null;
+let tags: TagStore | null = null;
 let threads: ThreadStore | null = null;
 let search: SearchStore | null = null;
+let noteSearch: NoteSearchStore | null = null;
 let trash: TrashStore | null = null;
 let exporter: ExportStore | null = null;
+let aiSettings: AiSettingsStore | null = null;
+let periodSummaries: PeriodSummaryStore | null = null;
 let initializationFailure: Result<never> = failure(
   new AppError('UNAVAILABLE', '本地数据尚未初始化。'),
 );
@@ -49,25 +57,46 @@ try {
   // 附图、归纳、事务与手记共用同一条连接，连接的所有权仍在 NoteStore。
   images = new NoteImageStore(store.connection(), dataDirectory);
   topics = new TopicStore(store.connection());
+  tags = new TagStore(store.connection());
   threads = new ThreadStore(store.connection());
   search = new SearchStore(store.connection());
+  noteSearch = new NoteSearchStore(store.connection());
   // 回收站的删除委托给各实体存储，因此在这里注入它们。
   trash = new TrashStore(store.connection(), store, topics, threads);
   exporter = new ExportStore(store.connection(), store, topics, threads);
+  aiSettings = new AiSettingsStore(store.connection());
+  periodSummaries = new PeriodSummaryStore(store.connection());
 } catch (error) {
   initializationFailure = failure(error);
 }
 
 function context(): StoreContext | null {
-  if (!store || !images || !topics || !threads || !search || !trash || !exporter) return null;
+  if (
+    !store ||
+    !images ||
+    !topics ||
+    !tags ||
+    !threads ||
+    !search ||
+    !noteSearch ||
+    !trash ||
+    !exporter ||
+    !aiSettings ||
+    !periodSummaries
+  )
+    return null;
   return {
     notes: store,
     images,
     topics,
+    tags,
     threads,
     search,
+    noteSearch,
     trash,
     exporter,
+    aiSettings,
+    periodSummaries,
     dataDirectory,
     migrationsDirectory,
   };

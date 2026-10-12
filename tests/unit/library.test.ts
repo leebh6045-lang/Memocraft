@@ -17,6 +17,7 @@ import type { BackupSummary, StagedRestore } from '../../src/storage/backup';
 import type { ExportSummary } from '../../src/storage/export-store';
 import type { Result } from '../../src/shared/errors';
 import { useLibrary } from '../../src/renderer/src/composables/useLibrary';
+import { disconnectedApi } from '../../src/renderer/src/api/bridge';
 
 interface Pending<Request, Response> {
   request: Request;
@@ -47,6 +48,7 @@ function unavailableEntry(): Result<EntrySummary> {
 
 /** 每个写请求由测试显式应答，确保能观察真实请求之间继续输入的行为。 */
 class ControlledApi implements MemocraftApi {
+  readonly ai = disconnectedApi.ai;
   readonly platform = 'mac' as const;
   readonly draftWrites: Pending<NoteDraft, NoteDraft>[] = [];
   readonly commits: Pending<NoteDraft, Note>[] = [];

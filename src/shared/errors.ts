@@ -1,4 +1,18 @@
-export type ErrorCode = 'VALIDATION' | 'CONFLICT' | 'NOT_FOUND' | 'STORAGE' | 'UNAVAILABLE';
+export type ErrorCode =
+  | 'VALIDATION'
+  | 'CONFLICT'
+  | 'NOT_FOUND'
+  | 'STORAGE'
+  | 'UNAVAILABLE'
+  | 'AI_NOT_CONFIGURED'
+  | 'AI_CREDENTIAL'
+  | 'AI_AUTH'
+  | 'AI_BALANCE'
+  | 'AI_RATE_LIMIT'
+  | 'AI_NETWORK'
+  | 'AI_TIMEOUT'
+  | 'AI_CANCELLED'
+  | 'AI_RESPONSE';
 
 export class AppError extends Error {
   constructor(

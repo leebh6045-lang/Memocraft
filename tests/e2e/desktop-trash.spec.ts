@@ -57,7 +57,11 @@ test('真实桌面：删除影响面、回收站与恢复顺序', async () => {
     const topicPicker = page.getByRole('dialog', { name: '收录手记' });
     await topicPicker.getByRole('checkbox').first().check();
     await topicPicker.getByRole('button', { name: '收录', exact: true }).click();
-    await expect(page.locator('.topic-note .card')).toHaveCount(1);
+    // 归纳详情默认连读；验证收录小节和真实标题，不依赖只有网格才出现的卡片。
+    await expect(page.locator('.doc-sec')).toHaveCount(1);
+    await expect(
+      page.getByRole('heading', { name: '会被多处引用的手记', exact: true }),
+    ).toBeVisible();
 
     await goHome(page);
     await page
@@ -126,7 +130,10 @@ test('真实桌面：删除影响面、回收站与恢复顺序', async () => {
       .first()
       .click();
     await page.locator('.card.collection').first().click();
-    await expect(page.locator('.topic-note .card')).toHaveCount(1);
+    await expect(page.locator('.doc-sec')).toHaveCount(1);
+    await expect(
+      page.getByRole('heading', { name: '会被多处引用的手记', exact: true }),
+    ).toBeVisible();
 
     // 事务：先单独删除一条动态，再删除事务。
     await page

@@ -1,5 +1,6 @@
 import type { LibrarySnapshot, Note, NoteDraft, NoteEdit } from '../domain/note';
 import type { SearchResult } from '../domain/search';
+import type { NoteSearchResult } from '../domain/note-search';
 import type {
   ImageInput,
   ImageOwner,
@@ -21,6 +22,7 @@ import type {
   TimelineOrder,
 } from '../domain/thread';
 import type { Result } from './errors';
+import type { AiApi, AiConfiguration, StoredAiPeriodSummary, PeriodNotesResult } from './ai';
 
 export const CHANNELS = {
   load: 'library:load',
@@ -62,10 +64,25 @@ export const CHANNELS = {
   closeRequested: 'window:close-requested',
   closeReady: 'window:close-ready',
   closeCancelled: 'window:close-cancelled',
+  aiLoadSettings: 'ai:load-settings',
+  aiSaveModel: 'ai:save-model',
+  aiSaveBaseUrl: 'ai:save-base-url',
+  aiSaveKey: 'ai:save-key',
+  aiClearKey: 'ai:clear-key',
+  aiTestConnection: 'ai:test-connection',
+  aiCancelTest: 'ai:cancel-test',
+  aiSuggest: 'ai:suggest',
+  aiCancelSuggestion: 'ai:cancel-suggestion',
+  aiAsk: 'ai:ask',
+  aiCancelAsk: 'ai:cancel-ask',
+  aiPeriodSummary: 'ai:period-summary',
+  aiCancelPeriodSummary: 'ai:cancel-period-summary',
 } as const;
 
 /** 渲染端只获得这些业务能力，不暴露通用 IPC 或文件操作。 */
 export interface MemocraftApi {
+  /** 只暴露明确的 AI 配置、测试、建议与问答能力；已保存的密钥不会回传给页面。 */
+  ai: AiApi;
   load(): Promise<Result<LibrarySnapshot>>;
   saveDraft(draft: NoteDraft): Promise<Result<NoteDraft>>;
   commitDraft(draft: NoteDraft): Promise<Result<Note>>;
@@ -139,10 +156,17 @@ export function imageUrl(image: Pick<NoteImage, 'id'>): string {
 
 export type StoreRequest =
   | { operation: 'load' }
+  | { operation: 'loadAiConfiguration' }
+  | { operation: 'saveAiModel'; payload: unknown }
+  | { operation: 'saveAiBaseUrl'; payload: unknown }
   | { operation: 'saveDraft'; payload: unknown }
   | { operation: 'commitDraft'; payload: unknown }
   | { operation: 'updateNote'; payload: unknown }
   | { operation: 'search'; payload: unknown }
+  | { operation: 'retrieveNotes'; payload: unknown }
+  | { operation: 'fetchPeriodNotes'; payload: unknown }
+  | { operation: 'loadPeriodSummary'; payload: unknown }
+  | { operation: 'savePeriodSummary'; payload: unknown }
   | { operation: 'loadImages'; payload: unknown }
   | { operation: 'loadImageIndex'; payload: unknown }
   | { operation: 'addImages'; payload: unknown }
@@ -150,6 +174,7 @@ export type StoreRequest =
   | { operation: 'deleteImage'; payload: unknown }
   | { operation: 'readImage'; payload: unknown }
   | { operation: 'loadTopics' }
+  | { operation: 'loadTagPool' }
   | { operation: 'createTopic'; payload: unknown }
   | { operation: 'updateTopic'; payload: unknown }
   | { operation: 'loadTrash' }
@@ -181,6 +206,7 @@ export interface ImageBytes {
 
 export type StoreValue =
   | LibrarySnapshot
+  | AiConfiguration
   | NoteDraft
   | Note
   | NoteImageList
@@ -188,12 +214,16 @@ export type StoreValue =
   | ImageBytes
   | TopicSummary
   | TopicSummary[]
+  | string[]
   | ThreadSummary
   | ThreadSummary[]
   | EntrySummary
   | EntrySummary[]
   | NoteReference[]
   | SearchResult
+  | NoteSearchResult
+  | PeriodNotesResult
+  | StoredAiPeriodSummary
   | TrashItem[]
   | RemovalImpact
   | ExportSummary

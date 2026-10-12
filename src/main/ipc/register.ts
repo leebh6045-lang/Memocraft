@@ -66,7 +66,11 @@ export function registerStoreIpc(
   window: BrowserWindow,
   rendererUrl: string,
   store: StoreClient,
-  libraryData: { dataDirectory: string },
+  libraryData: {
+    dataDirectory: string;
+    beforeRestore?: () => Promise<void>;
+    afterRestore?: () => void;
+  },
 ): () => void {
   // 无载荷与有载荷的操作走同一个分发入口；载荷由 services 校验，这里不解析内容。
   const operations = [
@@ -187,7 +191,11 @@ export function registerStoreIpc(
     ipcMain.handle(channel, async (event) => {
       if (!isTrustedSender(event, window, rendererUrl))
         return failure(new AppError('UNAVAILABLE', '请求来源无效。'));
-      return run();
+      try {
+        return await run();
+      } catch (error) {
+        return failure(error);
+      }
     });
   };
   guarded(CHANNELS.backupLibrary, () =>
@@ -226,8 +234,15 @@ export function registerStoreIpc(
     ),
   );
   guarded(CHANNELS.applyRestore, async () => {
-    const result = await applyRestore(deps);
-    return result.ok ? { ok: true, value: null } : result;
+    // 整库替换会改变模型配置，先终止基于旧快照的请求并排空独立凭据写入。
+    try {
+      await libraryData.beforeRestore?.();
+      const result = await applyRestore(deps);
+      return result.ok ? { ok: true, value: null } : result;
+    } finally {
+      // 整个替换期间暂停入口，成功或失败都重新开放 AI。
+      libraryData.afterRestore?.();
+    }
   });
 
   return () => {

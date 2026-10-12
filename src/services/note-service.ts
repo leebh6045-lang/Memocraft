@@ -4,10 +4,23 @@ import { STAGING_DIRECTORY } from '../storage/recovery';
 import type { NoteStore } from '../storage/note-store';
 import type { NoteImageStore } from '../storage/note-image-store';
 import type { TopicStore } from '../storage/topic-store';
+import type { TagStore } from '../storage/tag-store';
 import type { ThreadStore } from '../storage/thread-store';
 import type { SearchStore } from '../storage/search-store';
+import type { NoteSearchStore } from '../storage/note-search-store';
+import { AI_ASK_INPUT_LIMIT, AI_ASK_MAX_TERMS } from '../shared/ai';
+import { AppError } from '../shared/errors';
 import type { TrashStore } from '../storage/trash-store';
 import type { ExportStore } from '../storage/export-store';
+import type { AiSettingsStore } from '../storage/ai-settings-store';
+import type { PeriodSummaryStore } from '../storage/period-summary-store';
+import {
+  validateAiModel,
+  validateAiBaseUrl,
+  validatePeriodNotesQuery,
+  validatePeriodSummaryKey,
+  validateStoredPeriodSummary,
+} from './ai-validation';
 import { backupLibrary, stageRestoreInto } from '../storage/backup';
 import {
   validateAddImages,
@@ -42,13 +55,38 @@ export interface StoreContext {
   notes: NoteStore;
   images: NoteImageStore;
   topics: TopicStore;
+  tags: TagStore;
   threads: ThreadStore;
   search: SearchStore;
+  noteSearch: NoteSearchStore;
   trash: TrashStore;
   exporter: ExportStore;
+  aiSettings: AiSettingsStore;
+  periodSummaries: PeriodSummaryStore;
   /** 数据目录与迁移目录：备份、恢复与导出都在存储线程内完成文件操作。 */
   dataDirectory: string;
   migrationsDirectory: string;
+}
+
+/** 词由主进程提取，但跨线程入口仍校验容量，不能静默截断非法载荷。 */
+function validateRetrievalTerms(input: unknown): string[] {
+  if (
+    typeof input !== 'object' ||
+    input === null ||
+    Array.isArray(input) ||
+    !('terms' in input) ||
+    !Array.isArray(input.terms) ||
+    input.terms.length > AI_ASK_MAX_TERMS
+  ) {
+    throw new AppError('VALIDATION', '问答检索最多接受 8 个关键词。');
+  }
+  const terms: string[] = [];
+  for (const value of input.terms) {
+    if (typeof value !== 'string' || !value.trim() || value.length > AI_ASK_INPUT_LIMIT)
+      throw new AppError('VALIDATION', '每个问答关键词须包含 1 至 200 个字符。');
+    terms.push(value.trim());
+  }
+  return [...new Set(terms)];
 }
 
 /**
@@ -59,8 +97,26 @@ export async function executeStoreRequest(
   stores: StoreContext,
   request: StoreRequest,
 ): Promise<StoreValue> {
-  const { notes: store, images, topics, threads, search, trash, exporter } = stores;
+  const {
+    notes: store,
+    images,
+    topics,
+    tags,
+    threads,
+    search,
+    noteSearch,
+    trash,
+    exporter,
+    aiSettings,
+    periodSummaries,
+  } = stores;
   switch (request.operation) {
+    case 'loadAiConfiguration':
+      return aiSettings.load();
+    case 'saveAiModel':
+      return aiSettings.saveModel(validateAiModel(request.payload));
+    case 'saveAiBaseUrl':
+      return aiSettings.saveBaseUrl(validateAiBaseUrl(request.payload));
     case 'load':
       return store.load();
     case 'saveDraft':
@@ -74,6 +130,17 @@ export async function executeStoreRequest(
       return store.updateNote(validateNoteEdit(request.payload));
     case 'search':
       return search.search(validateSearch(request.payload));
+    case 'retrieveNotes':
+      return noteSearch.retrieve(validateRetrievalTerms(request.payload));
+    case 'fetchPeriodNotes':
+      return periodSummaries.fetchPeriodNotes(validatePeriodNotesQuery(request.payload));
+    case 'loadPeriodSummary': {
+      const key = validatePeriodSummaryKey(request.payload);
+      return periodSummaries.loadPeriodSummary(key.periodType, key.startDate);
+    }
+    case 'savePeriodSummary':
+      periodSummaries.savePeriodSummary(validateStoredPeriodSummary(request.payload));
+      return null;
     case 'loadImages':
       return images.list(validateImageOwner(request.payload));
     case 'loadImageIndex':
@@ -94,6 +161,8 @@ export async function executeStoreRequest(
     }
     case 'loadTopics':
       return topics.list();
+    case 'loadTagPool':
+      return tags.list();
     case 'createTopic':
       return topics.create(validateTopicCreate(request.payload));
     case 'updateTopic':

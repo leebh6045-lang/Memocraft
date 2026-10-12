@@ -6,7 +6,8 @@ import MarkdownIt from 'markdown-it';
  * 手记抽屉与动态正文共用同一份配置，避免两处安全设置漂移。
  */
 const markdown = new MarkdownIt({ html: false, linkify: false, breaks: true });
-markdown.disable(['image', 'link']);
+// linkify: false 仍会解析 <https://…> 与 <邮箱>，须同时关闭 autolink 才能只显示文字。
+markdown.disable(['image', 'link', 'autolink']);
 
 export function renderMarkdown(text: string): string {
   return markdown.render(text);

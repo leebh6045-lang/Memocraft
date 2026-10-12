@@ -142,7 +142,11 @@ test('真实桌面：随手记三种呈现、按时间分段与归纳目录', as
       'true',
     );
     await arrangement.getByRole('radio', { name: '目录' }).click();
-    const entry = page.locator('.toc-item').filter({ hasText: '呈现验收归纳甲' });
+    // “另见”辅助文本也包含其它归纳标题，只用目录主标题定位所属行。
+    const entry = page.locator('.toc-item').filter({
+      has: page.getByRole('button', { name: '呈现验收归纳甲', exact: true }),
+    });
+    await expect(entry).toHaveCount(1);
     await expect(entry.locator('.toc-count')).toHaveText('2 条');
     await expect(entry.locator('.toc-note')).toHaveCount(2);
     await expect(entry.locator('.toc-note').filter({ hasText: '呈现验收二' })).toContainText(
@@ -158,7 +162,7 @@ test('真实桌面：随手记三种呈现、按时间分段与归纳目录', as
     await expect(noteDrawer).toBeVisible();
     await noteDrawer.getByRole('button', { name: /^关闭/ }).click();
     await expect(noteDrawer).toHaveCount(0);
-    await entry.getByRole('button', { name: /呈现验收归纳甲/ }).click();
+    await entry.getByRole('button', { name: '呈现验收归纳甲', exact: true }).click();
     await expect(page.locator('.detail-title')).toContainText('呈现验收归纳甲');
 
     // 归纳详情默认连读：每条手记一个小节，右侧本页目录与小节一一对应。
@@ -186,7 +190,10 @@ test('真实桌面：随手记三种呈现、按时间分段与归纳目录', as
     await page.locator('.doc-sec').first().hover();
     await page.locator('.doc-sec').first().getByRole('button', { name: '打开' }).click();
     await expect(noteDrawer).toBeVisible();
-    await expect(noteDrawer).toContainText('呈现验收一');
+    // 编辑正文位于textarea.value，不属于抽屉textContent；核对完整原文才能证明打开正确手记。
+    await expect(noteDrawer.getByRole('textbox', { name: '编辑手记正文' })).toHaveValue(
+      '呈现验收一：事务回滚\n- 先开事务\n- 失败时回滚',
+    );
     await noteDrawer.getByRole('button', { name: /^关闭/ }).click();
     await expect(noteDrawer).toHaveCount(0);
     await page.locator('.doc-sec').first().hover();
@@ -227,7 +234,7 @@ test('真实桌面：随手记三种呈现、按时间分段与归纳目录', as
     await expect(reopened.locator('.time-group .card')).toHaveCount(3);
     await openModule(reopened, /知识归纳/, '知识归纳');
     await expect(reopened.locator('.toc-item')).toHaveCount(2);
-    await reopened.locator('.toc-item').filter({ hasText: '呈现验收归纳甲' }).click();
+    await reopened.getByRole('button', { name: '呈现验收归纳甲', exact: true }).click();
     await expect(
       reopened.getByRole('radiogroup', { name: '呈现方式' }).getByRole('radio', { name: '连读' }),
     ).toHaveAttribute('aria-checked', 'true');

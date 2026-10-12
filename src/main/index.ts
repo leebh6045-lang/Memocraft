@@ -1,4 +1,4 @@
-import { app, dialog, Menu } from 'electron';
+import { app, dialog, Menu, net, safeStorage } from 'electron';
 import { isAbsolute, join } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { StoreClient } from './store-client';
@@ -10,6 +10,14 @@ import { registerImageScheme, serveImageProtocol } from './image-protocol';
 import { coordinateWindowClose } from './close-window';
 import { AppError } from '../shared/errors';
 import { mkdirSync } from 'node:fs';
+import { AiCredentialStore } from './ai-credentials';
+import { AiService } from './ai-service';
+import { AiSuggestionService } from './ai-suggestion-service';
+import { AiAskService } from './ai-ask-service';
+import { AiPeriodSummaryService } from './ai-period-summary-service';
+import { AiImageReader } from './ai-image-reader';
+import { DeepSeekClient } from '../services/deepseek-client';
+import { registerAiIpc } from './ipc/ai';
 
 // 从终端启动后若终端被关闭，写 stdout/stderr 会失败（EIO/EPIPE）。Electron 内部也会写日志
 // （例如向已销毁的界面发消息时 console.error），没有监听就会变成"主进程未捕获异常"弹窗。
@@ -27,9 +35,12 @@ registerImageScheme();
 // 测试同时隔离数据库与 Chromium 外观/缓存，不污染日常开发的窗口偏好。
 const isolatedDirectory = process.env.MEMOCRAFT_DATA_DIR;
 if (isolatedDirectory && isAbsolute(isolatedDirectory)) {
-  const shellDirectory = join(isolatedDirectory, 'shell');
-  mkdirSync(shellDirectory, { recursive: true });
-  app.setPath('userData', shellDirectory);
+  // AI 恢复测试把 shell 与知识库设为兄弟目录，避免整库替换删除测试凭据。
+  const shellDirectory = process.env.MEMOCRAFT_USER_DATA_DIR ?? join(isolatedDirectory, 'shell');
+  if (isAbsolute(shellDirectory)) {
+    mkdirSync(shellDirectory, { recursive: true });
+    app.setPath('userData', shellDirectory);
+  }
 }
 
 async function start(): Promise<void> {
@@ -38,6 +49,11 @@ async function start(): Promise<void> {
   const testDataDirectory = process.env.MEMOCRAFT_DATA_DIR;
   if (testDataDirectory && !isAbsolute(testDataDirectory))
     throw new Error('隔离数据目录必须使用绝对路径。');
+  if (
+    process.env.MEMOCRAFT_USER_DATA_DIR &&
+    (!testDataDirectory || !isAbsolute(process.env.MEMOCRAFT_USER_DATA_DIR))
+  )
+    throw new Error('隔离应用配置目录必须配合隔离数据目录并使用绝对路径。');
   const dataDirectory =
     testDataDirectory ??
     join(app.getPath('userData'), ...(app.isPackaged ? ['data'] : ['development', 'data']));
@@ -71,9 +87,75 @@ async function start(): Promise<void> {
   const rendererUrl = devUrl
     ? new URL(devUrl).href
     : pathToFileURL(fileURLToPath(new URL('../renderer/index.html', import.meta.url))).href;
-  const unregister = registerStoreIpc(window, rendererUrl, store, { dataDirectory });
-  coordinateWindowClose(window, rendererUrl, store);
+  // 凭据在知识库目录之外；开发、正式与隔离测试各自使用对应 userData。
+  const credentialDirectory = join(
+    app.getPath('userData'),
+    ...(app.isPackaged || testDataDirectory ? [] : ['development']),
+    'credentials',
+  );
+  const credentials = new AiCredentialStore(credentialDirectory, {
+    isAvailable: () =>
+      safeStorage.isEncryptionAvailable() &&
+      (process.platform !== 'linux' || safeStorage.getSelectedStorageBackend() !== 'basic_text'),
+    encryptString: (value) => safeStorage.encryptString(value),
+    decryptString: (value) => safeStorage.decryptString(value),
+  });
+  const client = new DeepSeekClient((url, init) => net.fetch(url, init));
+  const ai = new AiService({
+    request: (request) => store.request(request),
+    credentials,
+    // Chromium 网络栈沿用系统代理配置，避免 Node fetch 绕过桌面网络设置。
+    client,
+  });
+  const imageReader = new AiImageReader({ request: (request) => store.request(request) });
+  const suggestions = new AiSuggestionService({
+    request: (request) => store.request(request),
+    resolveCallContext: () => ai.resolveCallContext(),
+    images: imageReader,
+    client,
+  });
+  const asks = new AiAskService({
+    request: (request) => store.request(request),
+    resolveCallContext: () => ai.resolveCallContext(),
+    client,
+  });
+  let aiPaused = false;
+  const periods = new AiPeriodSummaryService({
+    request: (request) => store.request(request),
+    resolveCallContext: () => ai.resolveCallContext(),
+    images: imageReader,
+    client,
+  });
+  async function pauseAndDrainAi(): Promise<void> {
+    aiPaused = true;
+    const results = await Promise.allSettled([
+      periods.stopAndDrain(),
+      asks.stopAndDrain(),
+      suggestions.stopAndDrain(),
+      ai.stopAndDrain(),
+    ]);
+    for (const result of results) if (result.status === 'rejected') throw result.reason;
+  }
+  const resumeAi = () => {
+    aiPaused = false;
+  };
+  const unregister = registerStoreIpc(window, rendererUrl, store, {
+    dataDirectory,
+    beforeRestore: pauseAndDrainAi,
+    afterRestore: resumeAi,
+  });
+  const unregisterAi = registerAiIpc(
+    window,
+    rendererUrl,
+    ai,
+    suggestions,
+    asks,
+    periods,
+    () => aiPaused,
+  );
+  coordinateWindowClose(window, rendererUrl, store, pauseAndDrainAi, resumeAi);
   window.once('closed', unregister);
+  window.once('closed', unregisterAi);
   app.on('second-instance', () => {
     if (window.isDestroyed()) return;
     if (window.isMinimized()) window.restore();

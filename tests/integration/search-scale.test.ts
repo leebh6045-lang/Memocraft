@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { NoteStore } from '../../src/storage/note-store';
 import { SCHEMA_VERSION } from '../../src/storage/schema';
 import { SearchStore } from '../../src/storage/search-store';
+import { NoteSearchStore } from '../../src/storage/note-search-store';
 
 const migrationsDirectory = resolve('migrations');
 /** 与「重新评估条件」对齐的规模：远大于个人日常积累量，用来判断是否需要引入索引。 */
@@ -19,6 +20,7 @@ const TIME_BUDGET_MS = 400;
 let temporaryDirectory: string;
 let store: NoteStore;
 let search: SearchStore;
+let noteSearch: NoteSearchStore;
 
 function now(offsetSeconds: number): string {
   return new Date(Date.UTC(2026, 0, 1, 0, 0, offsetSeconds % 3600)).toISOString();
@@ -77,6 +79,7 @@ beforeEach(() => {
   }
   connection.exec('COMMIT');
   search = new SearchStore(connection);
+  noteSearch = new NoteSearchStore(connection);
 });
 
 afterEach(() => {
@@ -111,5 +114,22 @@ describe('真实数据量下的搜索耗时', () => {
     for (const result of [rare, common, specific, recent]) {
       expect(result.ms).toBeLessThan(TIME_BUDGET_MS);
     }
+  });
+});
+
+/** 问答与全局搜索分别计时，不能用其中一项变快掩盖另一项退化。 */
+describe('真实数据量下的问答检索耗时', () => {
+  it('2000 条手记、8 个词与完整总数统计在 400ms 预算内', () => {
+    noteSearch.retrieve(['热身']);
+    const terms = ['罕见关键词', 'SQLite', '事务', '正文', '记录', '文字', '代码', 'SELECT'];
+    const started = performance.now();
+    const result = noteSearch.retrieve(terms);
+    const ms = performance.now() - started;
+    console.log(
+      `[问答检索测量] 8 词：${ms.toFixed(1)} ms，命中总数 ${result.total}，候选 ${result.hits.length} 条`,
+    );
+    expect(result.hits).toHaveLength(8);
+    expect(result.total).toBe(NOTE_COUNT);
+    expect(ms).toBeLessThan(TIME_BUDGET_MS);
   });
 });

@@ -1,5 +1,7 @@
 import {
   NOTE_CATEGORIES,
+  NOTE_MAX_TAGS,
+  NOTE_TAG_MAX_LENGTH,
   type NoteCategory,
   type NoteContent,
   type NoteDraft,
@@ -83,10 +85,11 @@ function content(input: Record<string, unknown>, requireBody: boolean): NoteCont
   if (requireBody && !input.body.trim()) invalid('请先写下正文，再保存手记。');
   if (typeof input.title !== 'string' || input.title.length > 300)
     invalid('标题不能超过 300 个字符。');
-  if (!Array.isArray(input.tags) || input.tags.length > 100) invalid('标签最多添加 100 个。');
+  if (!Array.isArray(input.tags) || input.tags.length > NOTE_MAX_TAGS)
+    invalid('标签最多添加 100 个。');
   const tags: string[] = [];
   for (const tag of input.tags) {
-    if (typeof tag !== 'string' || !tag.trim() || tag.length > 100)
+    if (typeof tag !== 'string' || !tag.trim() || tag.length > NOTE_TAG_MAX_LENGTH)
       invalid('每个标签须包含 1 至 100 个字符。');
     tags.push(tag.trim());
   }
@@ -299,7 +302,7 @@ function entryTags(input: unknown): string[] {
   if (!Array.isArray(input) || input.length > 100) invalid('标签最多 100 个。');
   const tags: string[] = [];
   for (const tag of input as unknown[]) {
-    if (typeof tag !== 'string' || !tag.trim() || tag.length > 100)
+    if (typeof tag !== 'string' || !tag.trim() || tag.length > NOTE_TAG_MAX_LENGTH)
       invalid('每个标签须包含 1 至 100 个字符。');
     tags.push((tag as string).trim());
   }

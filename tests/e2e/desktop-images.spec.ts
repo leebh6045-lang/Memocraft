@@ -98,7 +98,7 @@ test('真实桌面：粘贴图片、命名、放大查看与移出，重启后�
 
     // 放大查看：模态浮层可关闭，关闭后焦点回到缩略图。
     await drawer.getByRole('button', { name: '放大查看 架构草图' }).click();
-    const viewer = page.getByRole('dialog', { name: '查看图片' });
+    let viewer = page.getByRole('dialog', { name: '查看图片' });
     await expect(viewer).toBeVisible();
     await expect(viewer.locator('.viewer-image')).toBeVisible();
     // 键盘路径在真实浏览器里断言：Esc 只关放大层，抽屉仍然在。
@@ -139,6 +139,8 @@ test('真实桌面：粘贴图片、命名、放大查看与移出，重启后�
     app = undefined;
     app = await launch();
     page = await app.firstWindow();
+    // 重启后的窗口是新的 Page，不能继续用已关闭页面的放大层定位器。
+    viewer = page.getByRole('dialog', { name: '查看图片' });
     page.on('pageerror', (error) => errors.push(error.message));
     await page
       .getByRole('button', { name: /随手记/ })

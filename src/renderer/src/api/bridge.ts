@@ -29,6 +29,21 @@ const emptyTrash: Result<TrashItem[]> = { ok: true, value: [] };
  * 写入仍然失败，不会出现「看起来保存成功」的假象。
  */
 export const disconnectedApi: MemocraftApi = {
+  ai: {
+    loadSettings: unavailable,
+    saveModel: unavailable,
+    saveBaseUrl: unavailable,
+    saveKey: unavailable,
+    clearKey: unavailable,
+    testConnection: unavailable,
+    cancelTest: unavailable,
+    suggest: unavailable,
+    cancelSuggestion: unavailable,
+    ask: unavailable,
+    cancelAsk: unavailable,
+    summarizePeriod: unavailable,
+    cancelPeriodSummary: unavailable,
+  },
   load: unavailable,
   saveDraft: unavailable,
   commitDraft: unavailable,

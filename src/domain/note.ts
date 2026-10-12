@@ -8,6 +8,10 @@ export const NOTE_CATEGORIES = [
 
 export type NoteCategory = (typeof NOTE_CATEGORIES)[number]['value'];
 
+/** 草稿与手记共用标签容量，采纳建议也必须遵守保存边界。 */
+export const NOTE_MAX_TAGS = 100;
+export const NOTE_TAG_MAX_LENGTH = 100;
+
 export interface NoteContent {
   body: string;
   title: string;

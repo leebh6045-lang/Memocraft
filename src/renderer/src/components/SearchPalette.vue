@@ -2,12 +2,31 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { SEARCH_KIND_LABELS, type SearchHit, type SearchKind } from '../../../domain/search';
 import type { MemocraftApi } from '../../../shared/contracts';
+import type { AiAnswer } from '../../../shared/ai';
+import type { AskPhase } from '../composables/useAiAsk';
+import AiAnswerRow from './AiAnswerRow.vue';
 import AppIcon from './AppIcon.vue';
 import { useModalFocus } from '../composables/useModalFocus';
 import { containsQuery, highlightMatch } from '../highlight';
 
-const props = defineProps<{ bridge: MemocraftApi; changeVersion: number }>();
-const emit = defineEmits<{ close: []; open: [hit: SearchHit]; all: [] }>();
+const props = defineProps<{
+  bridge: MemocraftApi;
+  changeVersion: number;
+  askPhase: AskPhase;
+  answer: AiAnswer | null;
+  askError: string;
+  askExpanded: boolean;
+}>();
+const emit = defineEmits<{
+  close: [];
+  open: [hit: SearchHit];
+  all: [];
+  'ask-query': [question: string];
+  'ask-retry': [];
+  'ask-expand': [];
+  'ask-collapse': [];
+  'open-note': [noteId: string];
+}>();
 const panel = ref<HTMLElement | null>(null);
 const { trapTab } = useModalFocus(panel, 'input');
 const query = ref('');
@@ -61,6 +80,8 @@ async function search(version: number) {
 }
 
 function scheduleSearch() {
+  // 问答由父层独立防抖，普通搜索仍保持既有的 120 ms 节奏。
+  emit('ask-query', query.value);
   clearTimeout(timer);
   const version = ++requestVersion;
   loading.value = true;
@@ -130,6 +151,17 @@ async function handleKeys(event: KeyboardEvent) {
         </button>
       </div>
       <div class="palette-results" :aria-busy="loading">
+        <!-- AI 行不属于 listbox，方向键的 index 始终只覆盖普通搜索 hits。 -->
+        <AiAnswerRow
+          :phase="askPhase"
+          :answer="answer"
+          :error="askError"
+          :expanded="askExpanded"
+          @retry="emit('ask-retry')"
+          @expand="emit('ask-expand')"
+          @collapse="emit('ask-collapse')"
+          @open-note="emit('open-note', $event)"
+        />
         <p v-if="error" class="palette-empty" role="alert">
           {{ error }}<button class="btn-ghost" @click="scheduleSearch">重试</button>
         </p>

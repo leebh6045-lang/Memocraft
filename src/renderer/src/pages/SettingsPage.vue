@@ -4,6 +4,7 @@ import type { MemocraftApi } from '../../../shared/contracts';
 import type { BackupSummary, StagedRestore } from '../../../domain/library-data';
 import AppDialog from '../components/AppDialog.vue';
 import AppIcon from '../components/AppIcon.vue';
+import AiSettingsPanel from '../components/AiSettingsPanel.vue';
 import type { ThemePreference } from '../theme';
 
 const props = defineProps<{ theme: ThemePreference; bridge: MemocraftApi; busy: boolean }>();
@@ -111,6 +112,11 @@ async function confirmRestore(): Promise<void> {
   }
 }
 
+/** 恢复不可取消，Esc 与按钮遵守同一约束，避免页面卸载后丢失整库替换通知。 */
+function closeRestoreDialog(): void {
+  if (!running.value) staged.value = null;
+}
+
 async function exportData(): Promise<void> {
   running.value = '正在导出';
   error.value = '';
@@ -135,7 +141,7 @@ async function exportData(): Promise<void> {
     <header class="page-head">
       <div>
         <h1>设置</h1>
-        <p class="sub">外观、数据与关于。正文与关系始终保存在本地数据库。</p>
+        <p class="sub">外观、AI、数据与关于。正文与关系始终保存在本地数据库。</p>
       </div>
     </header>
 
@@ -161,6 +167,12 @@ async function exportData(): Promise<void> {
         </div>
       </div>
     </section>
+
+    <AiSettingsPanel
+      :ai="props.bridge.ai"
+      :busy="props.busy || !!running"
+      @notify="emit('notify', $event)"
+    />
 
     <section class="panel">
       <h2>数据</h2>
@@ -224,14 +236,14 @@ async function exportData(): Promise<void> {
       v-if="staged"
       title="从备份恢复"
       hint="将使用所选备份替换当前全部数据"
-      @close="staged = null"
+      @close="closeRestoreDialog"
     >
       <p class="restore-counts">{{ stagedLabel }}</p>
       <p class="restore-warning">
         当前的手记、归纳、事务、动态与草稿都会被替换。恢复开始后<b>不能取消</b>，期间请不要关闭应用；开始前会自动把当前数据备份到数据目录，失败时会回滚到现在的状态。
       </p>
       <template #footer>
-        <button class="btn-quiet" :disabled="!!running" @click="staged = null">取消</button>
+        <button class="btn-quiet" :disabled="!!running" @click="closeRestoreDialog">取消</button>
         <button class="btn-primary" :disabled="!!running" @click="confirmRestore">开始恢复</button>
       </template>
     </AppDialog>

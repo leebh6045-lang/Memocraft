@@ -3,6 +3,22 @@ import { CHANNELS, type MemocraftApi } from '../shared/contracts';
 
 // 桥接层仅转发白名单调用；输入校验与业务规则在主进程侧执行。
 const api: MemocraftApi = {
+  ai: {
+    loadSettings: () => ipcRenderer.invoke(CHANNELS.aiLoadSettings),
+    saveModel: (model) => ipcRenderer.invoke(CHANNELS.aiSaveModel, model),
+    saveBaseUrl: (baseUrl) => ipcRenderer.invoke(CHANNELS.aiSaveBaseUrl, baseUrl),
+    saveKey: (key) => ipcRenderer.invoke(CHANNELS.aiSaveKey, key),
+    clearKey: () => ipcRenderer.invoke(CHANNELS.aiClearKey),
+    testConnection: (requestId) => ipcRenderer.invoke(CHANNELS.aiTestConnection, requestId),
+    cancelTest: (requestId) => ipcRenderer.invoke(CHANNELS.aiCancelTest, requestId),
+    suggest: (input) => ipcRenderer.invoke(CHANNELS.aiSuggest, input),
+    cancelSuggestion: (requestId) => ipcRenderer.invoke(CHANNELS.aiCancelSuggestion, requestId),
+    ask: (input) => ipcRenderer.invoke(CHANNELS.aiAsk, input),
+    cancelAsk: (requestId) => ipcRenderer.invoke(CHANNELS.aiCancelAsk, requestId),
+    summarizePeriod: (input) => ipcRenderer.invoke(CHANNELS.aiPeriodSummary, input),
+    cancelPeriodSummary: (requestId) =>
+      ipcRenderer.invoke(CHANNELS.aiCancelPeriodSummary, requestId),
+  },
   load: () => ipcRenderer.invoke(CHANNELS.load),
   saveDraft: (draft) => ipcRenderer.invoke(CHANNELS.saveDraft, draft),
   commitDraft: (draft) => ipcRenderer.invoke(CHANNELS.commitDraft, draft),

@@ -2,12 +2,15 @@ import { app, dialog, ipcMain, type BrowserWindow, type IpcMainEvent } from 'ele
 import { CHANNELS } from '../shared/contracts';
 import type { StoreClient } from './store-client';
 import { isTrustedSender } from './window';
+import { AppError } from '../shared/errors';
 
 /** 先让界面刷新独立编辑现场，再排空存储消息并关库。失败始终保留窗口。 */
 export function coordinateWindowClose(
   window: BrowserWindow,
   rendererUrl: string,
   store: StoreClient,
+  settleExternalTasks?: () => Promise<void>,
+  resumeExternalTasks?: () => void,
 ): void {
   let approved = false;
   let awaitingRenderer = false;
@@ -41,6 +44,8 @@ export function coordinateWindowClose(
   async function finishClose(): Promise<void> {
     closingStore = true;
     try {
+      // AI 密钥是独立文件；等已提交的写入结束，网络请求则由协作者取消。
+      await settleExternalTasks?.();
       const result = await store.close();
       if (!result.ok) {
         dialog.showMessageBoxSync(window, {
@@ -55,14 +60,16 @@ export function coordinateWindowClose(
       approved = true;
       window.destroy();
       app.quit();
-    } catch {
+    } catch (error) {
       dialog.showMessageBoxSync(window, {
         type: 'error',
         title: '尚未退出',
-        message: '数据服务关闭失败，请保留编辑内容后重试。',
+        message: '操作未能确认完成，窗口与输入已保留。',
+        detail: error instanceof AppError ? error.message : '请检查未保存内容后重试关闭。',
       });
     } finally {
       closingStore = false;
+      if (!approved) resumeExternalTasks?.();
       if (!approved && !window.isDestroyed()) window.webContents.send(CHANNELS.closeCancelled);
     }
   }

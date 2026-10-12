@@ -9,6 +9,9 @@ import {
 } from '../../../domain/note';
 import { draftOwner } from '../../../domain/note-image';
 import AppIcon from '../components/AppIcon.vue';
+import AiSuggestionCard from '../components/AiSuggestionCard.vue';
+import type { AiSuggestion } from '../../../shared/ai';
+import type { SuggestionPhase } from '../composables/useAiSuggestion';
 import { formatFullTime, formatTime } from '../format-time';
 import CategorySelector from '../components/CategorySelector.vue';
 import NoteImageGallery from '../components/NoteImageGallery.vue';
@@ -28,10 +31,20 @@ const props = defineProps<{
   draftImages: NoteImageState;
   /** 图片归属草稿，写入前先确认草稿行已经落盘；返回 false 表示保存没成功。 */
   ensureDraftStored: () => Promise<boolean>;
+  suggestionPhase: SuggestionPhase;
+  suggestionResult: AiSuggestion | null;
+  suggestionError: string;
+  suggestionStale: boolean;
+  suggestionLoading: boolean;
+  suggestionBusy: boolean;
 }>();
 const emit = defineEmits<{
   change: [patch: Partial<NoteContent & { extrasOpen: boolean }>];
   save: [];
+  suggest: [];
+  'close-suggestion': [];
+  'apply-tag': [tag: string];
+  'open-topic': [id: string];
   retry: [];
   open: [id: string];
   navigate: [page: 'notes' | 'topics' | 'threads'];
@@ -224,6 +237,16 @@ function removeTag(tag: string): void {
           </button>
         </div>
         <div class="editor-bar-right">
+          <button
+            class="btn-quiet"
+            :disabled="
+              busy || !draft.body.trim() || suggestionLoading || galleryBusy || galleryLoading
+            "
+            @click="emit('suggest')"
+          >
+            <AppIcon name="sparkle" class="icon-s" :class="{ 'suggest-spin': suggestionLoading }" />
+            {{ suggestionLoading ? '正在生成…' : 'AI 建议' }}
+          </button>
           <kbd>{{ shortcut }} ↩</kbd
           ><button
             class="btn-primary"
@@ -240,6 +263,18 @@ function removeTag(tag: string): void {
         </div>
       </div>
     </div>
+    <AiSuggestionCard
+      :phase="suggestionPhase"
+      :suggestion="suggestionResult"
+      :error="suggestionError"
+      :is-stale="suggestionStale"
+      :selected-tags="draft.tags"
+      :busy="suggestionBusy"
+      @close="emit('close-suggestion')"
+      @retry="emit('suggest')"
+      @apply-tag="emit('apply-tag', $event)"
+      @open-topic="emit('open-topic', $event)"
+    />
     <div class="draft-status" :class="{ error, 'is-empty': !status && !error }" aria-live="polite">
       <span class="dot" /><span>{{ error || status }}</span
       ><button v-if="error" class="btn-ghost" @click="emit('retry')">重试</button>
@@ -284,3 +319,19 @@ function removeTag(tag: string): void {
     />
   </section>
 </template>
+
+<style scoped>
+.suggest-spin {
+  animation: suggest-spin 1.5s linear infinite;
+}
+@keyframes suggest-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .suggest-spin {
+    animation: none;
+  }
+}
+</style>
