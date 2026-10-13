@@ -6,7 +6,7 @@ const props = defineProps<{ module: 'topics' | 'threads' }>();
 const copy = computed(() => {
   if (props.module === 'topics') {
     return {
-      title: '知识归纳',
+      title: '主题归纳',
       subtitle: '围绕一个主题收录手记，让零散的收获逐渐连在一起。',
       action: '新建归纳',
       heading: '归纳功能尚未开放',

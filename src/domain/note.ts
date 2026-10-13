@@ -1,9 +1,11 @@
 // 分类顺序是产品约定；完成语义也由 category 表达，不另存任务状态。
 export const NOTE_CATEGORIES = [
   { value: 'insight', label: '收获' },
+  { value: 'thought', label: '思绪' },
   { value: 'todo', label: '待办' },
   { value: 'done', label: '完成' },
-  { value: 'misc', label: '杂项' },
+  // 其他沿用旧杂项的标识，旧手记与草稿无需转换。
+  { value: 'misc', label: '其他' },
 ] as const;
 
 export type NoteCategory = (typeof NOTE_CATEGORIES)[number]['value'];
@@ -70,7 +72,7 @@ export function noteExcerpt(note: NoteContent): string {
 }
 
 export function categoryLabel(category: NoteCategory): string {
-  return NOTE_CATEGORIES.find((item) => item.value === category)?.label ?? '杂项';
+  return NOTE_CATEGORIES.find((item) => item.value === category)?.label ?? '其他';
 }
 
 export function emptyDraft(id: string): NoteDraft {

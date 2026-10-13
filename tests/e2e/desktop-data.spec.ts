@@ -69,7 +69,7 @@ test('真实桌面：备份、恢复、损坏备份拒绝与可读导出', async
       .click();
     await page
       .getByRole('dialog', { name: '新建事务' })
-      .getByRole('textbox', { name: '标题' })
+      .getByRole('textbox', { name: '标题（必填）', exact: true })
       .fill('备份样例事务');
     await page
       .getByRole('dialog', { name: '新建事务' })
@@ -87,7 +87,7 @@ test('真实桌面：备份、恢复、损坏备份拒绝与可读导出', async
     await page.getByRole('tab', { name: '数据与备份', exact: true }).click();
     await stubSaveDialog(packPath);
     await page.getByRole('button', { name: '选择位置并备份' }).click();
-    await expect(page.locator('.toast').filter({ hasText: '已备份' })).toBeVisible();
+    await expect(page.locator('.toast').filter({ hasText: '备份已完成' })).toBeVisible();
     expect(existsSync(join(packPath, 'backup.json'))).toBe(true);
     expect(existsSync(join(packPath, 'memocraft.sqlite'))).toBe(true);
     await expect(page.getByText(/上次备份：/)).toBeVisible();
@@ -100,7 +100,8 @@ test('真实桌面：备份、恢复、损坏备份拒绝与可读导出', async
     await page.getByRole('button', { name: '保存手记', exact: true }).click();
     await expect(body).toHaveValue('');
     await page
-      .getByRole('button', { name: /随手记/ })
+      .getByRole('navigation', { name: '主导航' })
+      .getByRole('button', { name: /^手记/ })
       .first()
       .click();
     await expect(page.locator('.card')).toHaveCount(2);
@@ -121,7 +122,8 @@ test('真实桌面：备份、恢复、损坏备份拒绝与可读导出', async
     await confirm.getByRole('button', { name: '开始恢复' }).click();
     await expect(page.locator('.toast').filter({ hasText: '恢复完成' })).toBeVisible();
     await page
-      .getByRole('button', { name: /随手记/ })
+      .getByRole('navigation', { name: '主导航' })
+      .getByRole('button', { name: /^手记/ })
       .first()
       .click();
     await expect(page.locator('.card')).toHaveCount(1);
@@ -146,7 +148,8 @@ test('真实桌面：备份、恢复、损坏备份拒绝与可读导出', async
     await expect(page.locator('.data-error')).toContainText('更新版本');
     await expect(page.getByRole('dialog', { name: '从备份恢复' })).toHaveCount(0);
     await page
-      .getByRole('button', { name: /随手记/ })
+      .getByRole('navigation', { name: '主导航' })
+      .getByRole('button', { name: /^手记/ })
       .first()
       .click();
     await expect(page.locator('.card')).toHaveCount(1);
@@ -170,8 +173,13 @@ test('真实桌面：备份、恢复、损坏备份拒绝与可读导出', async
     app = await launch();
     const reopened = await app.firstWindow();
     reopened.on('pageerror', (error) => errors.push(error.message));
-    await expect(reopened.getByRole('button', { name: /随手记/ })).toBeVisible();
-    await reopened.getByRole('button', { name: /随手记/ }).click();
+    await expect(
+      reopened.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: /^手记/ }),
+    ).toBeVisible();
+    await reopened
+      .getByRole('navigation', { name: '主导航' })
+      .getByRole('button', { name: /^手记/ })
+      .click();
     await expect(reopened.locator('.card')).toHaveCount(1);
     expect(existsSync(join(directory, '.restore-pending'))).toBe(false);
     expect(existsSync(join(directory, '.restore-staging'))).toBe(false);

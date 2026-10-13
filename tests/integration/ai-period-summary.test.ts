@@ -488,7 +488,7 @@ describe('周期图片归属与上下文边界', () => {
     );
     note({ title: '待办', category: 'todo' });
     note({ title: '完成', category: 'done' });
-    note({ title: '杂项', category: 'misc' });
+    note({ title: '其他', category: 'misc' });
     const [last, missing, gif, webp, unsampled] = [
       insights[20],
       insights[19],
@@ -600,7 +600,7 @@ describe('周期图片归属与上下文边界', () => {
     ).toEqual(ids.slice(0, 4));
   });
 
-  it('2000 条真实手记返回全量统计，发往模型的每类摘录最多五条且每条正文有界', async () => {
+  it('2000 条五类真实手记返回全量统计，每类摘录四条且每条正文有界', async () => {
     const connection = stores.notes.connection();
     const startAt = localDateToUtcStart('2026-10-06');
     const insert = connection.prepare(`
@@ -609,7 +609,7 @@ describe('周期图片归属与上下文边界', () => {
     `);
     transaction(connection, () => {
       for (let index = 0; index < 2000; index += 1) {
-        const category = NOTE_CATEGORIES[index % 4];
+        const category = NOTE_CATEGORIES[index % NOTE_CATEGORIES.length];
         if (!category) throw new Error('分类样例缺失');
         const at = new Date(new Date(startAt).getTime() + index * 1000).toISOString();
         insert.run(
@@ -632,7 +632,7 @@ describe('周期图片归属与上下文边界', () => {
     const lines = content.split('\n').filter((line) => /^\[\d+\] /.test(line));
     expect(lines).toHaveLength(20);
     for (const category of NOTE_CATEGORIES)
-      expect(lines.filter((line) => line.includes(`] ${category.label} |`))).toHaveLength(5);
+      expect(lines.filter((line) => line.includes(`] ${category.label} |`))).toHaveLength(4);
     for (const line of lines) {
       const excerpt = line.split(' | ')[2];
       if (!excerpt) throw new Error('规模摘录缺失');

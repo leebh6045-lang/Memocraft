@@ -190,7 +190,7 @@ test('真实桌面：归纳建议采纳、过期、取消、恢复和正常关�
     await generate.click();
     await expect(card.getByRole('alert')).toContainText('API Key');
     await page.locator('.toast').getByRole('button', { name: '前往设置', exact: true }).click();
-    const settings = page.getByRole('region', { name: 'AI 设置', exact: true });
+    const settings = page.getByRole('region', { name: /^(?:AI 服务|为 Memocraft 接入 AI)$/ });
     await expect(settings).toBeVisible();
     await expect(card).toHaveCount(0);
     await settings.locator('#ai-key').fill(testKey);
@@ -294,9 +294,7 @@ test('真实桌面：归纳建议采纳、过期、取消、恢复和正常关�
     const editedBody = `${draftBody}正文在生成期间修改。`;
     await body.fill(editedBody);
     await releaseSupplier(app);
-    await expect(
-      card.getByText('正文或图片已修改，建议可能不再匹配。', { exact: false }),
-    ).toBeVisible();
+    await expect(card.getByText('内容改了，建议可能不再适用。', { exact: false })).toBeVisible();
     await saved();
 
     // 关闭在途卡片后立即可重生；旧响应晚到不会覆盖新结果。
@@ -336,7 +334,8 @@ test('真实桌面：归纳建议采纳、过期、取消、恢复和正常关�
     await generate.click();
     await expect.poll(async () => (await supplierState(firstApp))?.started).toBe(true);
     await page
-      .getByRole('button', { name: /^随手记/ })
+      .getByRole('navigation', { name: '主导航' })
+      .getByRole('button', { name: /^手记/ })
       .first()
       .click();
     await expect.poll(async () => (await supplierState(firstApp))?.aborted).toBe(true);

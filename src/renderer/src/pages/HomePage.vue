@@ -4,6 +4,7 @@ import {
   categoryLabel,
   noteTitle,
   type Note,
+  type NoteCategory,
   type NoteContent,
   type NoteDraft,
 } from '../../../domain/note';
@@ -59,6 +60,16 @@ const shaking = ref(false);
 /** 标签在右侧抽屉里点选：补充区只留已选胶囊与入口，永远一行。 */
 const tagOpen = ref(false);
 let shakeTimer: ReturnType<typeof setTimeout> | undefined;
+
+// 提示只随当前分类派生，不写入正文，也不重建编辑器节点。
+const bodyPlaceholders: Record<NoteCategory, string> = {
+  insight: '现在想到什么……',
+  thought: '此刻的心情或想法……',
+  todo: '接下来想做什么……',
+  done: '记下一件做完的事……',
+  misc: '随手记点什么……',
+};
+const bodyPlaceholder = computed(() => bodyPlaceholders[props.draft.category]);
 
 const owner = computed(() => draftOwner(props.draft.id));
 // 图集状态摊平为普通值：模板只绑定基本类型，与手记详情里的做法一致。
@@ -155,8 +166,8 @@ function removeTag(tag: string): void {
   <section class="view view-home">
     <header class="page-head">
       <div>
-        <h1>新手记</h1>
-        <p class="sub">只需写下正文，其他都可以稍后补。</p>
+        <h1>新建手记</h1>
+        <p class="sub">先写下来，其他慢慢补。</p>
       </div>
       <button class="btn-quiet" :aria-pressed="focused" @click="emit('focus')">
         <AppIcon name="focus" />专注
@@ -167,7 +178,7 @@ function removeTag(tag: string): void {
         ref="body"
         class="editor-body"
         aria-label="手记正文"
-        placeholder="现在想到什么……"
+        :placeholder="bodyPlaceholder"
         :value="draft.body"
         :disabled="busy"
         @input="emit('change', { body: ($event.target as HTMLTextAreaElement).value })"
@@ -311,7 +322,7 @@ function removeTag(tag: string): void {
 
     <TagPickerDrawer
       :open="tagOpen"
-      :hint="draft.title.trim() || '新手记'"
+      :hint="draft.title.trim() || '新建手记'"
       :model-value="draft.tags"
       :busy="busy"
       @update:model-value="setTags"

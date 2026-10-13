@@ -34,8 +34,8 @@ const staged = ref<StagedRestore | null>(null);
 const sections = [
   { id: 'appearance', label: '外观', icon: 'sun' },
   { id: 'ai', label: 'AI 服务', icon: 'sparkle' },
-  { id: 'data', label: '数据与备份', icon: 'notes' },
-  { id: 'about', label: '关于', icon: 'home' },
+  { id: 'data', label: '数据与备份', icon: 'database' },
+  { id: 'about', label: '关于', icon: 'info' },
 ] as const;
 type SettingsSection = (typeof sections)[number]['id'];
 const activeSection = ref<SettingsSection>(props.initialSection ?? 'appearance');
@@ -85,7 +85,7 @@ function readLastBackup(): BackupSummary | null {
 
 const lastBackupLabel = computed(() => {
   const backup = lastBackup.value;
-  if (!backup) return '还没有备份过；备份包含数据库快照、图片附件与校验清单';
+  if (!backup) return '暂无备份记录。';
   return `上次备份：${new Date(backup.createdAt).toLocaleString('zh-CN')} · ${formatBytes(backup.bytes)} · 附件 ${backup.attachments} 个`;
 });
 
@@ -118,7 +118,7 @@ async function backup(): Promise<void> {
     } catch {
       // 记不住「上次备份」不影响备份本身，降级为仅本次会话可见。
     }
-    emit('notify', { message: `已备份 ${result.value.attachments} 个附件` });
+    emit('notify', { message: `备份已完成，包含 ${result.value.attachments} 个图片附件。` });
   } finally {
     running.value = '';
   }
@@ -357,25 +357,35 @@ async function exportData(): Promise<void> {
             :aria-hidden="activeSection !== 'about'"
           >
             <div class="settings-pane-scroll">
-              <section class="panel">
-                <h2>关于</h2>
-                <p class="panel-sub">开发阶段应用固定显示「内测中」，不展示虚构的发布版本。</p>
-                <dl class="kv">
-                  <dt>发行标识</dt>
-                  <dd>内测中</dd>
-                  <dt>数据库</dt>
-                  <dd>SQLite（应用内置驱动）· 结构化数据唯一主存储</dd>
-                  <dt>图片</dt>
-                  <dd>保存在应用用户数据目录的 attachments/，随备份一起复制</dd>
-                </dl>
+              <section class="panel about-section" aria-labelledby="settings-about-project-title">
+                <h2 id="settings-about-project-title">项目简介</h2>
+                <p class="about-copy">
+                  Memocraft是一个本地优先的个人知识库，帮你留下学习、工作和生活中的想法与收获。无论是一句灵感、一段经验，还是一件需要慢慢推进的事，都可以从一条手记开始。
+                </p>
+                <p class="about-copy">
+                  你可以把相关手记归纳到一起，记录长期事务的进展，也可以通过搜索和回顾重新找到它们。让零散的记录一点点积累，成为以后用得上的经验。
+                </p>
               </section>
-
-              <p class="settings-note">
-                <AppIcon
-                  name="check"
-                  class="icon-s"
-                />数据位置由应用数据目录派生，不写入安装目录，也不在界面展示本机绝对路径。
-              </p>
+              <section class="panel about-section" aria-labelledby="settings-about-author-title">
+                <h2 id="settings-about-author-title">作者想说的话</h2>
+                <p class="about-copy">
+                  我常常遇到这样的困扰：认真学过一门科目，过一阵子，很多内容却慢慢淡忘。我希望留下学习的脚印，回顾时既能温习重点，也能看见自己花时间积累下来的成果，让这些积累成为继续学习的动力。
+                </p>
+                <p class="about-copy">
+                  别人教会的一个技巧，或自己摸索后突然明白的一个方法，也常让我觉得：“原来还可以这样，我得记下来。”可这些收获散落在文档和记事本里，写完容易忘，时间久了也难找。我想把它们整理在一起，让当时的理解留得住、用得上。
+                </p>
+                <p class="about-copy">
+                  有些事情则需要沿着时间慢慢记录。从最初的想法，到后来的尝试、调整和进展，我都希望留下经过。等以后回头看时，能知道事情是怎样一步步走到现在的，也能在遇到问题时找到线索。
+                </p>
+                <p class="about-copy">
+                  我也想给日常的心情和思绪留一点空间。一天里的开心与低落，对生活的感触，或某个瞬间冒出的念头，都值得被记下来。这些文字可以很零碎，也可以暂时没有答案。等以后回头翻看这些记录时，还能重新想起当时的感受，看看自己的想法是怎样一点点变化的。
+                </p>
+                <p class="about-copy">
+                  如此如此，这般这般，Memocraft
+                  就这样诞生了。它从我的需要出发，也希望能帮到有相似困扰的你。你可以按自己的节奏使用它：几句话的小收获、当下的心情，或还没想清楚的念头，都可以先写下来，等有空再补充、整理。希望回头翻看时，你既能看见自己的积累，也能多理解一点过去的自己。谢谢你愿意使用它。
+                </p>
+                <footer class="about-signature">—— Ly</footer>
+              </section>
             </div>
           </section>
         </Transition>
@@ -577,28 +587,26 @@ async function exportData(): Promise<void> {
   line-height: 1.7;
   color: var(--muted);
 }
-.kv {
-  display: grid;
-  grid-template-columns: 88px 1fr;
-  gap: 8px 14px;
-  margin: 16px 0 0;
-  padding-top: 14px;
+/* 关于页按短文阅读，两部分用留白与细线分隔，正文沿用主题的次要文字色。 */
+.about-section {
+  max-width: 620px;
+}
+.about-section + .about-section {
+  margin-top: 32px;
+  padding-top: 24px;
   border-top: 1px solid var(--border);
-  font-size: 13px;
 }
-.kv dt {
-  color: var(--faint);
+.about-copy {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.85;
 }
-.kv dd {
-  margin: 0;
-}
-.settings-note {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-  font-size: 12px;
-  color: var(--faint);
+.about-signature {
+  margin-top: 20px;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: right;
 }
 @container (max-width: 460px) {
   .panel-row {
@@ -608,9 +616,6 @@ async function exportData(): Promise<void> {
   }
   .panel-row > button {
     align-self: flex-end;
-  }
-  .kv {
-    grid-template-columns: 64px minmax(0, 1fr);
   }
 }
 @media (max-width: 1100px) {

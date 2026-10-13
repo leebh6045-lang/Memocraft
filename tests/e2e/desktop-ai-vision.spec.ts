@@ -58,8 +58,10 @@ async function quit(app: ElectronApplication): Promise<void> {
 async function openSettings(page: Page): Promise<Locator> {
   await page.getByRole('button', { name: /设置/ }).first().click();
   await page.getByRole('tab', { name: 'AI 服务', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'AI 设置', exact: true })).toBeVisible();
-  return page.getByRole('region', { name: 'AI 设置', exact: true });
+  await expect(
+    page.getByRole('heading', { name: /^(?:AI 服务|为 Memocraft 接入 AI)$/ }),
+  ).toBeVisible();
+  return page.getByRole('region', { name: /^(?:AI 服务|为 Memocraft 接入 AI)$/ });
 }
 
 async function setKey(page: Page): Promise<void> {
@@ -366,7 +368,8 @@ test('真实桌面：Flash 视觉建议顺序、预算提示、stale 与 Pro 降
     await generate(page);
     await expect.poll(async () => (await mockState(currentApp))?.calls.length).toBe(1);
     await page
-      .getByRole('button', { name: /^随手记/ })
+      .getByRole('navigation', { name: '主导航' })
+      .getByRole('button', { name: /^手记/ })
       .first()
       .click();
     await expect.poll(async () => (await mockState(currentApp))?.aborted).toBe(true);

@@ -231,7 +231,7 @@ describe('首页 AI 建议接线与导航', () => {
     expect(observedDraft(home.props('draft')).body).toBe('修改后的未保存正文');
     expect(home.props('suggestionPhase')).toBe('ready');
     expect(app.text()).toContain('保存未完成，已留在当前页面');
-    await nav(app, '知识归纳').trigger('click');
+    await nav(app, '主题归纳').trigger('click');
     await flushPromises();
     expect(app.getComponent(TopicsPage).props('openSignal')).toBeNull();
   });
@@ -260,14 +260,14 @@ describe('首页 AI 建议接线与导航', () => {
     vi.mocked(bridge.loadTopics).mockReturnValueOnce(lookup.promise);
     home.vm.$emit('open-topic', topic.id);
     await flushPromises();
-    await nav(app, '随手记').trigger('click');
+    await nav(app, '手记').trigger('click');
     await flushPromises();
     expect(app.findComponent(NotesPage).exists()).toBe(true);
     lookup.resolve(success([topic]));
     await flushPromises();
     expect(app.findComponent(NotesPage).exists()).toBe(true);
     expect(app.findComponent(TopicsPage).exists()).toBe(false);
-    await nav(app, '知识归纳').trigger('click');
+    await nav(app, '主题归纳').trigger('click');
     await flushPromises();
     expect(app.getComponent(TopicsPage).props('openSignal')).toBeNull();
   });

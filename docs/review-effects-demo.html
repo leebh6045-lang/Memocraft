@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>回顾动效方案</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500&family=Noto+Sans+SC:wght@400;500&display=swap">
+<style>
+/* ─── Tokens ─────────────────────────────────────────── */
+:root {
+  --bg:        #F7F6F3;
+  --surface:   #FFFFFF;
+  --border:    #E5E2DC;
+  --text:      #1A1917;
+  --muted:     #6B665F;
+  --faint:     #A39D96;
+  --accent:    #4A67E3;
+  --accent-bg: #EEF1FC;
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:        #131210;
+    --surface:   #1D1C19;
+    --border:    #2D2C28;
+    --text:      #E6E3DD;
+    --muted:     #8A847C;
+    --faint:     #59534D;
+    --accent:    #7089F0;
+    --accent-bg: #1E2340;
+    color-scheme: dark;
+  }
+}
+
+/* ─── Reset & Base ───────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Noto Sans SC', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.7;
+  padding-inline: 20px;
+  padding-block: 48px 64px;
+}
+
+/* ─── Page Header ────────────────────────────────────── */
+.page-header { max-width: 760px; margin: 0 auto 44px; }
+.page-header h1 {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  text-wrap: balance;
+}
+.page-header p {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* ─── Grid ───────────────────────────────────────────── */
+.grid {
+  max-width: 760px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+@media (max-width: 560px) {
+  .grid { grid-template-columns: 1fr; }
+}
+
+/* ─── Card ───────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.card-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.card-num {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--faint);
+  letter-spacing: 0.05em;
+}
+.card-name {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+}
+.card-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+/* ─── Demo Area ──────────────────────────────────────── */
+.demo-area {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  min-height: 210px;
+  overflow: hidden;
+  position: relative;
+}
+.demo-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--faint);
+  margin-bottom: 10px;
+}
+.demo-para {
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+.demo-item {
+  font-size: 12px;
+  color: var(--muted);
+  padding-block: 6px;
+  border-top: 1px solid var(--border);
+  line-height: 1.6;
+}
+.demo-item:first-of-type { margin-top: 2px; }
+
+/* ─── Replay Button ──────────────────────────────────── */
+.replay-btn {
+  align-self: flex-start;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.2s, color 0.2s;
+  margin-top: auto;
+}
+.replay-btn:hover { border-color: var(--accent); color: var(--accent); }
+.replay-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ─── 方案 A: 浮现 ──────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.demo-a .anim-block {
+  opacity: 0;
+  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.demo-a .anim-block:nth-child(1) { animation-delay: 0.05s; }
+.demo-a .anim-block:nth-child(2) { animation-delay: 0.25s; }
+.demo-a .anim-block:nth-child(3) { animation-delay: 0.45s; }
+.demo-a .anim-block:nth-child(4) { animation-delay: 0.65s; }
+.demo-a .anim-block:nth-child(5) { animation-delay: 0.80s; }
+
+/* ─── 方案 B: 凝结 ──────────────────────────────────── */
+@keyframes sharpen {
+  from { opacity: 0; filter: blur(5px); }
+  50%  { opacity: 0.7; filter: blur(1px); }
+  to   { opacity: 1; filter: blur(0); }
+}
+.demo-b .anim-block {
+  opacity: 0;
+  animation: sharpen 0.7s ease forwards;
+}
+.demo-b .anim-block:nth-child(1) { animation-delay: 0.0s; }
+.demo-b .anim-block:nth-child(2) { animation-delay: 0.35s; }
+.demo-b .anim-block:nth-child(3) { animation-delay: 0.65s; }
+.demo-b .anim-block:nth-child(4) { animation-delay: 0.95s; }
+.demo-b .anim-block:nth-child(5) { animation-delay: 1.1s; }
+
+/* ─── 方案 C: 流写 ─────────────────────────────────── */
+.demo-c .typewriter-line { color: var(--text); }
+.demo-c .cursor {
+  display: inline-block;
+  width: 1.5px;
+  height: 1em;
+  background: var(--accent);
+  vertical-align: text-bottom;
+  animation: blink 0.8s step-end infinite;
+  margin-left: 1px;
+}
+@keyframes blink {
+  50% { opacity: 0; }
+}
+.demo-c .after-type {
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.demo-c .after-type.visible { opacity: 1; }
+
+/* ─── 方案 D: 脉络 ──────────────────────────────────── */
+@keyframes kwFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.demo-d .anim-block {
+  opacity: 0;
+  animation: kwFadeIn 0.4s ease forwards;
+}
+.demo-d .anim-block:nth-child(1) { animation-delay: 0.05s; }
+.demo-d .anim-block:nth-child(2) { animation-delay: 0.2s; }
+.demo-d .anim-block:nth-child(3) { animation-delay: 0.38s; }
+.demo-d .anim-block:nth-child(4) { animation-delay: 0.52s; }
+.demo-d .anim-block:nth-child(5) { animation-delay: 0.65s; }
+
+@keyframes kwPulse {
+  0%   { color: var(--text); }
+  30%  { color: var(--accent); }
+  100% { color: var(--text); }
+}
+.demo-d .kw {
+  transition: color 0.3s;
+}
+.demo-d .kw.lit {
+  animation: kwPulse 0.9s ease forwards;
+}
+
+/* ─── Reduced motion ─────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .anim-block, .cursor { animation: none !important; }
+  .anim-block { opacity: 1 !important; filter: none !important; transform: none !important; }
+  .after-type { opacity: 1 !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="page-header">
+  <h1>回顾 · 动效方案</h1>
+  <p>四种轻量方案参考，目标是让用户感受到「由内到外」的智能气质——而非直接写明"AI 生成"。点击「↺ 重播」体验效果。</p>
+</header>
+
+<main class="grid">
+
+  <!-- ── 方案 A: 浮现 ── -->
+  <div class="card">
+    <div class="card-meta">
+      <span class="card-num">01</span>
+      <span class="card-name">浮现</span>
+    </div>
+    <p class="card-desc">内容块依次从下方淡入，每个段落自成节奏。用户感知到内容在「层层展开」，而非一次性呈现。</p>
+    <div class="demo-area demo-a" id="demo-a">
+      <div class="anim-block demo-label">总结</div>
+      <div class="anim-block demo-para">本期积累呈现清晰的主线：网络协议是最集中的方向，10 条手记里既有 ICMP 协议的系统梳理，也有代理与 VPN 的对比辨析。</div>
+      <div class="anim-block demo-label" style="margin-top:4px">推荐</div>
+      <div class="anim-block demo-item">网络协议归纳已有 10 条，可把 ICMP、代理/VPN、OSI 三份内容合并成一份分层笔记。</div>
+      <div class="anim-block demo-item">超时待办已有 8 条，建议优先处理 7 天以上的旧项。</div>
+    </div>
+    <button class="replay-btn" data-target="a">↺ 重播</button>
+  </div>
+
+  <!-- ── 方案 B: 凝结 ── -->
+  <div class="card">
+    <div class="card-meta">
+      <span class="card-num">02</span>
+      <span class="card-name">凝结</span>
+    </div>
+    <p class="card-desc">文字从模糊逐渐聚焦清晰，像洞见从雾中凝聚成形。暗示内容经过「思考」后才清晰落地。</p>
+    <div class="demo-area demo-b" id="demo-b">
+      <div class="anim-block demo-label">总结</div>
+      <div class="anim-block demo-para">本期积累呈现清晰的主线：网络协议是最集中的方向，10 条手记里既有 ICMP 协议的系统梳理，也有代理与 VPN 的对比辨析。</div>
+      <div class="anim-block demo-label" style="margin-top:4px">推荐</div>
+      <div class="anim-block demo-item">网络协议归纳已有 10 条，可把 ICMP、代理/VPN、OSI 三份内容合并成一份分层笔记。</div>
+      <div class="anim-block demo-item">超时待办已有 8 条，建议优先处理 7 天以上的旧项。</div>
+    </div>
+    <button class="replay-btn" data-target="b">↺ 重播</button>
+  </div>
+
+  <!-- ── 方案 C: 流写 ── -->
+  <div class="card">
+    <div class="card-meta">
+      <span class="card-num">03</span>
+      <span class="card-name">流写</span>
+    </div>
+    <p class="card-desc">首句逐字出现，模拟实时推理过程；光标消失后其余内容淡入。用户感知到页面「刚刚生成完」。</p>
+    <div class="demo-area demo-c" id="demo-c">
+      <div class="demo-label" style="opacity:0;transition:opacity 0.3s" id="c-label">总结</div>
+      <p class="demo-para" style="min-height:3.5em">
+        <span class="typewriter-line" id="c-type"></span><span class="cursor" id="c-cursor" hidden></span>
+      </p>
+      <div class="after-type" id="c-after">
+        <div class="demo-label" style="margin-top:4px">推荐</div>
+        <div class="demo-item">网络协议归纳已有 10 条，可把 ICMP、代理/VPN、OSI 三份内容合并成一份分层笔记。</div>
+        <div class="demo-item">超时待办已有 8 条，建议优先处理 7 天以上的旧项。</div>
+      </div>
+    </div>
+    <button class="replay-btn" data-target="c">↺ 重播</button>
+  </div>
+
+  <!-- ── 方案 D: 脉络 ── -->
+  <div class="card">
+    <div class="card-meta">
+      <span class="card-num">04</span>
+      <span class="card-name">脉络</span>
+    </div>
+    <p class="card-desc">内容正常淡入后，关键词依次短暂点亮再熄灭，像 AI 在标注它「提炼过」的重点。</p>
+    <div class="demo-area demo-d" id="demo-d">
+      <div class="anim-block demo-label">总结</div>
+      <div class="anim-block demo-para">本期积累呈现清晰的主线：<span class="kw">网络协议</span>是最集中的方向，10 条手记里既有 <span class="kw">ICMP 协议</span>的系统梳理，也有<span class="kw">代理与 VPN</span> 的对比辨析。</div>
+      <div class="anim-block demo-label" style="margin-top:4px">推荐</div>
+      <div class="anim-block demo-item">网络协议归纳已有 10 条，可把 ICMP、代理/VPN、OSI 三份内容<span class="kw">合并成一份分层笔记</span>。</div>
+      <div class="anim-block demo-item">超时待办已有 8 条，建议<span class="kw">优先处理 7 天以上的旧项</span>。</div>
+    </div>
+    <button class="replay-btn" data-target="d">↺ 重播</button>
+  </div>
+
+</main>
+
+<script>
+function restartAnims(el) {
+  el.querySelectorAll('.anim-block').forEach(b => {
+    b.style.animation = 'none';
+    b.offsetHeight;
+    b.style.animation = '';
+  });
+}
+
+const C_TEXT = '本期积累呈现清晰的主线：网络协议是最集中的方向，10 条手记里既有 ICMP 协议的系统梳理，也有代理与 VPN 的对比辨析。';
+let cTimer = null;
+
+function runC() {
+  const label  = document.getElementById('c-label');
+  const typEl  = document.getElementById('c-type');
+  const cursor = document.getElementById('c-cursor');
+  const after  = document.getElementById('c-after');
+
+  clearInterval(cTimer);
+  label.style.opacity = '0';
+  typEl.textContent = '';
+  cursor.hidden = true;
+  after.classList.remove('visible');
+
+  setTimeout(() => { label.style.opacity = '1'; }, 80);
+
+  setTimeout(() => {
+    cursor.hidden = false;
+    let i = 0;
+    cTimer = setInterval(() => {
+      typEl.textContent = C_TEXT.slice(0, i + 1);
+      i++;
+      if (i >= C_TEXT.length) {
+        clearInterval(cTimer);
+        setTimeout(() => {
+          cursor.hidden = true;
+          after.classList.add('visible');
+        }, 400);
+      }
+    }, 42);
+  }, 200);
+}
+
+function runD() {
+  const area = document.getElementById('demo-d');
+  restartAnims(area);
+
+  const kws = area.querySelectorAll('.kw');
+  kws.forEach(kw => kw.classList.remove('lit'));
+
+  let delay = 1150;
+  kws.forEach(kw => {
+    setTimeout(() => {
+      kw.classList.add('lit');
+      setTimeout(() => kw.classList.remove('lit'), 900);
+    }, delay);
+    delay += 480;
+  });
+}
+
+document.querySelectorAll('.replay-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const t = btn.dataset.target;
+    if (t === 'a') restartAnims(document.getElementById('demo-a'));
+    if (t === 'b') restartAnims(document.getElementById('demo-b'));
+    if (t === 'c') runC();
+    if (t === 'd') runD();
+  });
+});
+
+runC();
+runD();
+</script>
+
+</body>
+</html>

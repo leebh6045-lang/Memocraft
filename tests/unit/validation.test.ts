@@ -22,6 +22,15 @@ import {
 const draft = () => ({ ...emptyDraft('786a261c-669d-4b44-8924-d68c1617d4ad'), body: '  正文\n\n' });
 
 describe('跨进程输入校验', () => {
+  it('思绪可以自动保存、正式提交和编辑；非法分类提示当前五类', () => {
+    const thought = { ...draft(), category: 'thought' };
+    expect(validateDraft(thought).category).toBe('thought');
+    expect(validateDraft(thought, true).category).toBe('thought');
+    expect(validateNoteEdit({ ...thought, expectedRevision: 1 }).category).toBe('thought');
+    expect(() => validateDraft({ ...draft(), category: 'unknown' })).toThrow(
+      '请选择收获、思绪、待办、完成、其他。',
+    );
+  });
   it('保留正文原文，并允许自动保存空草稿', () => {
     expect(validateDraft(draft(), true).body).toBe('  正文\n\n');
     expect(validateDraft({ ...draft(), body: '' }).body).toBe('');

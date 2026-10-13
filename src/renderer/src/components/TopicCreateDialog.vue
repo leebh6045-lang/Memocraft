@@ -16,13 +16,9 @@ const description = ref('');
 </script>
 
 <template>
-  <AppDialog
-    title="新建归纳"
-    hint="标题必填，说明可以稍后补。允许同名，重命名不会重写已收录的关系。"
-    @close="emit('close')"
-  >
+  <AppDialog title="新建归纳" hint="先起个名字，说明以后再补。" @close="emit('close')">
     <label class="field"
-      >标题<input
+      >标题（必填）<input
         data-autofocus
         :value="title"
         maxlength="300"

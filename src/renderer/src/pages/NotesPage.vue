@@ -84,8 +84,8 @@ const timeGroups = computed(() =>
   <section class="view">
     <header class="page-head">
       <div>
-        <h1>随手记</h1>
-        <p class="sub">全部有效手记，按创建时间倒序。</p>
+        <h1>手记</h1>
+        <p class="sub">最近写下的手记排在前面。</p>
       </div>
       <button class="btn-primary" @click="emit('write')">
         <AppIcon name="plus" class="icon-s" />写手记

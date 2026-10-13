@@ -35,13 +35,14 @@ try {
     id: randomUUID(),
     body: '实际运行时 中文 100%_',
     title: '',
-    category: 'insight',
+    category: 'thought',
     tags: [],
     revision: 1,
     extrasOpen: false,
   };
   await request({ operation: 'saveDraft', payload: draft });
-  await request({ operation: 'commitDraft', payload: draft });
+  const saved = await request({ operation: 'commitDraft', payload: draft });
+  assert.equal(saved.category, 'thought');
   // 全对象搜索：普通符号按文本匹配，草稿不参与，因此只应命中刚提交的那条手记。
   const found = await request({ operation: 'search', payload: '100%_' });
   assert.equal(found.hits.length, 1);

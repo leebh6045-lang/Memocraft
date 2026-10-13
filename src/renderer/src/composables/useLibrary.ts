@@ -94,7 +94,8 @@ export function useLibrary(api: MemocraftApi) {
       draftStatus.value = snapshot.draft?.body ? '已恢复上次草稿' : '';
       loaded.value = true;
     } catch (error) {
-      loadError.value = errorMessage(error);
+      // 加载失败不涉及保存现场；未知错误不能承诺输入已经保留。
+      loadError.value = error instanceof AppError ? error.message : '知识库暂时无法读取，请重试。';
     } finally {
       loading.value = false;
     }
@@ -239,7 +240,7 @@ export function useLibrary(api: MemocraftApi) {
           : nextDraft;
         savedDraftRevision = 0;
         latestSavedId.value = note.id;
-        draftStatus.value = '已保存到随手记';
+        draftStatus.value = '已保存到手记';
         draftError.value = '';
         if (clearedAfterSubmission)
           draftTimer = setTimeout(() => {

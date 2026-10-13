@@ -13,26 +13,33 @@
 ## 模块说明
 
 ### note-taking/
-随手记功能相关文档
+
+手记功能相关文档
 
 ### topic-induction/
-知识归纳功能相关文档
+
+主题归纳功能相关文档
 
 ### tagging/
+
 标签系统相关文档
 
 ### image-handling/
+
 图片处理功能相关文档
 
 ### ui-improvements/
+
 界面优化相关文档
 
 ### ai/
+
 AI 功能集成相关文档
 
 ## 使用模板
 
 在 `docs/.templates/` 目录下有三个文档模板：
+
 - 任务书模板.md
 - 设计文档模板.md
 - 交付文档模板.md

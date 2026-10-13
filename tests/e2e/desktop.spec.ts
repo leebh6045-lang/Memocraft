@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { test, expect, _electron as electron, type ElectronApplication } from '@playwright/test';
 
-test('真实桌面：草稿重启、四分类、保存、搜索、抽屉编辑与安全预览', async () => {
+test('真实桌面：草稿重启、五分类、保存、搜索、抽屉编辑与安全预览', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'memocraft-desktop-'));
   let app: ElectronApplication | undefined;
   const launch = async () => {
@@ -27,11 +27,43 @@ test('真实桌面：草稿重启、四分类、保存、搜索、抽屉编辑�
     let page = await app.firstWindow();
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await expect(page.getByRole('heading', { name: '新手记', exact: true })).toBeVisible();
-    await page
-      .getByRole('textbox', { name: '手记正文', exact: true })
-      .fill('尚未提交的中文草稿 📝\n保留第二行');
-    await page.getByRole('radio', { name: '待办', exact: true }).check();
+    await expect(page.getByRole('heading', { name: '新建手记', exact: true })).toBeVisible();
+    await expect(page.locator('.category-option span')).toHaveText([
+      '收获',
+      '思绪',
+      '待办',
+      '完成',
+      '其他',
+    ]);
+    const body = page.getByRole('textbox', { name: '手记正文', exact: true });
+    // 空白提示跟随真实单选分类；只切分类不把提示写成正文。
+    for (const [category, placeholder] of [
+      ['收获', '现在想到什么……'],
+      ['思绪', '此刻的心情或想法……'],
+      ['待办', '接下来想做什么……'],
+      ['完成', '记下一件做完的事……'],
+      ['其他', '随手记点什么……'],
+    ] as const) {
+      await page.getByRole('radio', { name: category, exact: true }).check();
+      await expect(body).toHaveAttribute('placeholder', placeholder);
+      await expect(body).toHaveValue('');
+      await page.screenshot({
+        path: `test-results/ui-copy-${category}.png`,
+        animations: 'disabled',
+      });
+    }
+    // 新提示在最小深色窗口也完整可读；切回收获再输入，继续验证正文随分类改选保留。
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(1000, 700));
+    await page.getByRole('button', { name: '深色', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await page.getByRole('radio', { name: '思绪', exact: true }).check();
+    await page.screenshot({ path: 'test-results/ui-copy-dark-small.png', animations: 'disabled' });
+    await page.getByRole('button', { name: '浅色', exact: true }).click();
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(1280, 900));
+    await page.getByRole('radio', { name: '收获', exact: true }).check();
+    await body.fill('尚未提交的中文草稿 📝\n保留第二行');
+    await page.getByRole('radio', { name: '思绪', exact: true }).check();
+    await expect(body).toHaveValue('尚未提交的中文草稿 📝\n保留第二行');
     await quit(app);
     app = undefined;
     app = await launch();
@@ -40,7 +72,12 @@ test('真实桌面：草稿重启、四分类、保存、搜索、抽屉编辑�
     await expect(page.getByRole('textbox', { name: '手记正文', exact: true })).toHaveValue(
       '尚未提交的中文草稿 📝\n保留第二行',
     );
-    await expect(page.getByRole('radio', { name: '待办', exact: true })).toBeChecked();
+    await expect(page.getByRole('radio', { name: '思绪', exact: true })).toBeChecked();
+    const restoredBody = page.getByRole('textbox', { name: '手记正文', exact: true });
+    await expect(restoredBody).toHaveAttribute('placeholder', '此刻的心情或想法……');
+    await restoredBody.fill('');
+    await expect(restoredBody).toHaveAttribute('placeholder', '此刻的心情或想法……');
+    await restoredBody.fill('尚未提交的中文草稿 📝\n保留第二行');
     await page.getByRole('button', { name: '补充', exact: true }).click();
     await page.getByRole('textbox', { name: '标题（可选）', exact: true }).fill('SQLite 证书记录');
     // 标签改为在右侧抽屉里点选：这里走自定义标签分支。
@@ -56,11 +93,24 @@ test('真实桌面：草稿重启、四分类、保存、搜索、抽屉编辑�
     await expect(page.getByRole('radio', { name: '收获', exact: true })).toBeChecked();
     await page.getByRole('textbox', { name: '手记正文', exact: true }).fill('独立首页草稿');
     await page
-      .getByRole('button', { name: /随手记/ })
+      .getByRole('navigation', { name: '主导航' })
+      .getByRole('button', { name: /^手记/ })
       .first()
       .click();
-    await expect(page.getByRole('heading', { name: '随手记', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '手记', exact: true })).toBeVisible();
     await expect(page.locator('.card')).toHaveCount(1);
+    await expect(page.locator('.filter-group .filter-btn')).toHaveText([
+      '收获0',
+      '思绪1',
+      '待办0',
+      '完成0',
+      '其他0',
+    ]);
+    await page.locator('.filter-group').getByRole('button', { name: /^思绪/ }).click();
+    await expect(page.locator('.card')).toHaveCount(1);
+    await expect(page.locator('.card .cat')).toHaveText('思绪');
+    await page.locator('.filter-group').getByRole('button', { name: /^其他/ }).click();
+    await expect(page.getByText('没有符合当前筛选条件的手记。')).toBeVisible();
     await page.getByRole('button', { name: /^完成/ }).click();
     await expect(page.getByText('没有符合当前筛选条件的手记。')).toBeVisible();
     await page.getByRole('button', { name: /^全部/ }).click();
@@ -79,6 +129,18 @@ test('真实桌面：草稿重启、四分类、保存、搜索、抽屉编辑�
     await search.press('Enter');
     const drawer = page.getByRole('dialog', { name: '手记详情' });
     await expect(drawer).toBeVisible();
+    await expect(drawer.locator('.category-option span')).toHaveText([
+      '收获',
+      '思绪',
+      '待办',
+      '完成',
+      '其他',
+    ]);
+    await drawer.getByRole('radio', { name: '其他', exact: true }).check();
+    await expect(drawer.getByText('已保存', { exact: true })).toBeVisible();
+    await expect(page.locator('.card .cat')).toHaveText('其他');
+    await drawer.getByRole('radio', { name: '待办', exact: true }).check();
+    await expect(page.locator('.card .cat')).toHaveText('待办');
     await drawer
       .getByRole('textbox', { name: '编辑手记正文' })
       .fill('修改后的正文 100%_\\\n```sql\nSELECT 1;\n```\n<script>alert(1)</script>');
@@ -150,15 +212,18 @@ test('真实写入失败：保留正文、阻止离开与关闭，修复后可�
   };
   try {
     const page = await app.firstWindow();
-    await expect(page.getByRole('heading', { name: '新手记', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '新建手记', exact: true })).toBeVisible();
     mutate(
       "CREATE TRIGGER fail_draft BEFORE INSERT ON note_drafts BEGIN SELECT RAISE(ABORT, 'isolated write failure'); END;",
     );
     const body = page.getByRole('textbox', { name: '手记正文', exact: true });
     await body.fill('真实写入失败也不能丢失的内容');
     await expect(page.getByText(/本地数据操作未完成/)).toBeVisible();
-    await page.getByRole('button', { name: /^随手记/ }).click();
-    await expect(page.getByRole('heading', { name: '新手记', exact: true })).toBeVisible();
+    await page
+      .getByRole('navigation', { name: '主导航' })
+      .getByRole('button', { name: /^手记/ })
+      .click();
+    await expect(page.getByRole('heading', { name: '新建手记', exact: true })).toBeVisible();
     await expect(page.getByText(/已留在当前页面/)).toBeVisible();
     await app.evaluate(({ BrowserWindow }) => {
       BrowserWindow.getAllWindows()[0]?.close();

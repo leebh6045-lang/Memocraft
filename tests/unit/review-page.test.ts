@@ -98,7 +98,7 @@ describe('回顾页面', () => {
     );
     expect(wrapper.get('time').attributes('datetime')).toBe(summary.generatedAt);
     expect(wrapper.get('.summary-meta').text()).toContain('上次生成于');
-    expect(wrapper.get('.summary-meta').text()).toContain('覆盖 3 条手记');
+    expect(wrapper.get('.summary-meta').text()).toContain('生成时有 3 条手记');
     expect(
       wrapper
         .get('.summary-meta')
@@ -365,13 +365,13 @@ describe('回顾页面', () => {
     state.phase.value = 'empty';
     state.busy.value = false;
     await wrapper.vm.$nextTick();
-    expect(wrapper.text()).toContain('这段时间没有新手记。');
+    expect(wrapper.text()).toContain('这段时间还没有手记，换一段看看。');
     expect(wrapper.find('[role="status"]').exists()).toBe(false);
     expect(wrapper.find('.period-count').exists()).toBe(false);
     state.phase.value = 'error';
     state.errorCode.value = 'AI_NOT_CONFIGURED';
     await wrapper.vm.$nextTick();
-    expect(wrapper.text()).toContain('请先在设置页配置 DeepSeek API Key');
+    expect(wrapper.text()).toContain('先去设置里接入 AI。');
     expect(wrapper.find('[role="status"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain('正在生成');
     await wrapper.get('.review-notice button').trigger('click');

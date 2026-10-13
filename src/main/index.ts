@@ -18,6 +18,7 @@ import { AiPeriodSummaryService } from './ai-period-summary-service';
 import { AiImageReader } from './ai-image-reader';
 import { DeepSeekClient } from '../services/deepseek-client';
 import { registerAiIpc } from './ipc/ai';
+import { registerHelpIpc } from './ipc/help';
 
 // 从终端启动后若终端被关闭，写 stdout/stderr 会失败（EIO/EPIPE）。Electron 内部也会写日志
 // （例如向已销毁的界面发消息时 console.error），没有监听就会变成"主进程未捕获异常"弹窗。
@@ -74,12 +75,20 @@ async function start(): Promise<void> {
   const initial = await store.request({ operation: 'load' });
   if (!initial.ok) throw new AppError(initial.error.code, initial.error.message);
 
-  const menu: Electron.MenuItemConstructorOptions[] = [
-    ...(process.platform === 'darwin' ? [{ role: 'appMenu' as const }] : []),
-    { role: 'editMenu' },
-    { role: 'windowMenu' },
-  ];
-  Menu.setApplicationMenu(Menu.buildFromTemplate(menu));
+  // Windows/Linux 的菜单是画在窗口里的，留着会在标题栏下方多出一条 Edit / Window 菜单，
+  // 与 macOS 的呈现（菜单在系统菜单栏，窗口内干净）不一致，因此这两个平台不注册应用菜单。
+  // 菜单角色只提供展示入口，撤销/复制/粘贴等由 Chromium 原生处理，不受影响；DevTools
+  // 改为通过 --remote-debugging-port、环境变量或源码调试，不再依赖菜单项。
+  if (process.platform === 'darwin') {
+    const menu: Electron.MenuItemConstructorOptions[] = [
+      { role: 'appMenu' },
+      { role: 'editMenu' },
+      { role: 'windowMenu' },
+    ];
+    Menu.setApplicationMenu(Menu.buildFromTemplate(menu));
+  } else {
+    Menu.setApplicationMenu(null);
+  }
   const window = createWindow();
   // 图片协议只由本窗口所属会话的存储能力应答，不注册到默认会话。
   serveImageProtocol(window.webContents.session, store);
@@ -153,9 +162,11 @@ async function start(): Promise<void> {
     periods,
     () => aiPaused,
   );
+  const unregisterHelp = registerHelpIpc(window, rendererUrl);
   coordinateWindowClose(window, rendererUrl, store, pauseAndDrainAi, resumeAi);
   window.once('closed', unregister);
   window.once('closed', unregisterAi);
+  window.once('closed', unregisterHelp);
   app.on('second-instance', () => {
     if (window.isDestroyed()) return;
     if (window.isMinimized()) window.restore();

@@ -49,6 +49,7 @@ function unavailableEntry(): Result<EntrySummary> {
 /** 每个写请求由测试显式应答，确保能观察真实请求之间继续输入的行为。 */
 class ControlledApi implements MemocraftApi {
   readonly ai = disconnectedApi.ai;
+  readonly openHelp = disconnectedApi.openHelp;
   readonly platform = 'mac' as const;
   readonly draftWrites: Pending<NoteDraft, NoteDraft>[] = [];
   readonly commits: Pending<NoteDraft, Note>[] = [];
@@ -258,6 +259,22 @@ afterEach(() => {
 });
 
 describe('首页草稿并发与提交', () => {
+  it('加载异常只说明无法读取，重试成功后恢复知识库，不承诺尚未出现的输入', async () => {
+    const api = new ControlledApi();
+    vi.spyOn(api, 'load').mockRejectedValueOnce(new Error('private loading detail'));
+    const scope = effectScope();
+    scopes.push(scope);
+    const library = scope.run(() => useLibrary(api));
+    if (!library) throw new Error('Vue 作用域未创建');
+    await library.initialize();
+    expect(library.loaded.value).toBe(false);
+    expect(library.loadError.value).toBe('知识库暂时无法读取，请重试。');
+    expect(api.draftWrites).toHaveLength(0);
+    await library.initialize();
+    expect(library.loaded.value).toBe(true);
+    expect(library.loadError.value).toBe('');
+  });
+
   it('保存期间继续输入不会被旧应答覆盖，flush 等到最新版本落盘', async () => {
     const { api, library } = await setup();
     library.changeDraft({ body: '第一段', tags: ['原标签'] });

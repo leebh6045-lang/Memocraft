@@ -63,7 +63,7 @@ defineEmits<{
     </template>
     <div v-else-if="phase === 'empty'" class="ai-ask" role="status">
       <AppIcon name="sparkle" class="icon-s" />
-      <span class="hint">你的手记里还没有关于这个的记录</span>
+      <span class="hint">这次没找到相关手记，换个词试试。</span>
     </div>
     <div v-else-if="phase === 'error'" class="ai-ask is-error" role="alert">
       <span class="error-message">{{ error }}</span>

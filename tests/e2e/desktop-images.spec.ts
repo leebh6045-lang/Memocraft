@@ -59,12 +59,13 @@ test('真实桌面：粘贴图片、命名、放大查看与移出，重启后�
     let page = await app.firstWindow();
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await expect(page.getByRole('heading', { name: '新手记', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '新建手记', exact: true })).toBeVisible();
     await page.getByRole('textbox', { name: '手记正文', exact: true }).fill('带图片的手记');
     await page.getByRole('button', { name: '保存手记', exact: true }).click();
     await expect(page.getByRole('textbox', { name: '手记正文', exact: true })).toHaveValue('');
     await page
-      .getByRole('button', { name: /随手记/ })
+      .getByRole('navigation', { name: '主导航' })
+      .getByRole('button', { name: /^手记/ })
       .first()
       .click();
     await expect(page.locator('.card')).toHaveCount(1);
@@ -143,7 +144,8 @@ test('真实桌面：粘贴图片、命名、放大查看与移出，重启后�
     viewer = page.getByRole('dialog', { name: '查看图片' });
     page.on('pageerror', (error) => errors.push(error.message));
     await page
-      .getByRole('button', { name: /随手记/ })
+      .getByRole('navigation', { name: '主导航' })
+      .getByRole('button', { name: /^手记/ })
       .first()
       .click();
     // 阅读流卡片露出附图：顶部写张数，缩略图仍按图片 ID 取图。
@@ -157,7 +159,7 @@ test('真实桌面：粘贴图片、命名、放大查看与移出，重启后�
 
     // 归纳连读里点同一张附图也能放大查看：与图集共用同一层。
     await page
-      .getByRole('button', { name: /知识归纳/ })
+      .getByRole('button', { name: /主题归纳/ })
       .first()
       .click();
     await page
@@ -165,7 +167,9 @@ test('真实桌面：粘贴图片、命名、放大查看与移出，重启后�
       .first()
       .click();
     const createTopic = page.getByRole('dialog', { name: '新建归纳' });
-    await createTopic.getByRole('textbox', { name: '标题', exact: true }).fill('图片验收归纳');
+    await createTopic
+      .getByRole('textbox', { name: '标题（必填）', exact: true })
+      .fill('图片验收归纳');
     await createTopic.getByRole('button', { name: '创建' }).click();
     await page.locator('.detail-head').getByRole('button', { name: '收录已有手记' }).click();
     const imagePicker = page.getByRole('dialog', { name: '收录手记' });
@@ -181,7 +185,8 @@ test('真实桌面：粘贴图片、命名、放大查看与移出，重启后�
     await expect(page.locator('.doc-sec')).toHaveCount(1);
 
     await page
-      .getByRole('button', { name: /随手记/ })
+      .getByRole('navigation', { name: '主导航' })
+      .getByRole('button', { name: /^手记/ })
       .first()
       .click();
     await page.locator('.card').first().click();
@@ -221,7 +226,7 @@ test('真实桌面：首页草稿粘贴图片，保存后成为这条手记的�
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     const body = page.getByRole('textbox', { name: '手记正文', exact: true });
-    await expect(page.getByRole('heading', { name: '新手记', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '新建手记', exact: true })).toBeVisible();
     // 草稿区的图集只有「添加图片」与一句提示，添加时自动先保存草稿。
     await expect(page.getByRole('button', { name: '添加图片' })).toBeVisible();
     await expect(page.getByText('（支持粘贴图片）')).toBeVisible();
@@ -247,7 +252,8 @@ test('真实桌面：首页草稿粘贴图片，保存后成为这条手记的�
     await expect(page.locator('.gallery-grid')).toHaveCount(0);
 
     await page
-      .getByRole('button', { name: /随手记/ })
+      .getByRole('navigation', { name: '主导航' })
+      .getByRole('button', { name: /^手记/ })
       .first()
       .click();
     await expect(page.locator('.card')).toHaveCount(1);
@@ -265,9 +271,10 @@ test('真实桌面：首页草稿粘贴图片，保存后成为这条手记的�
     app = await launchApp(directory);
     const reopened = await app.firstWindow();
     reopened.on('pageerror', (error) => errors.push(error.message));
-    await expect(reopened.getByRole('heading', { name: '新手记', exact: true })).toBeVisible();
+    await expect(reopened.getByRole('heading', { name: '新建手记', exact: true })).toBeVisible();
     await reopened
-      .getByRole('button', { name: /随手记/ })
+      .getByRole('navigation', { name: '主导航' })
+      .getByRole('button', { name: /^手记/ })
       .first()
       .click();
     await expect(reopened.locator('.card').first()).toBeVisible();

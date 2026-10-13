@@ -415,7 +415,7 @@ test('真实桌面：回顾引导、自动生成、持久缓存、周期导航�
     expect((await mockState(app))?.requests).toHaveLength(0);
 
     await page.getByRole('button', { name: '前往设置', exact: true }).click();
-    const settings = page.getByRole('region', { name: 'AI 设置', exact: true });
+    const settings = page.getByRole('region', { name: /^(?:AI 服务|为 Memocraft 接入 AI)$/ });
     await settings.locator('#ai-key').fill('test-only-period-review-key');
     await settings.getByRole('button', { name: '保存密钥', exact: true }).click();
     await expect(settings.locator('label[for="ai-key"] .pr-hint')).toHaveText('已配置');
@@ -532,7 +532,9 @@ test('真实桌面：回顾引导、自动生成、持久缓存、周期导航�
     await weekList.getByRole('option').nth(1).press('Enter');
     await expect(weekList).toHaveCount(0);
     await expect(reopened.locator('.period-trigger')).toBeFocused();
-    await expect(reopened.getByText('这段时间没有新手记。', { exact: true })).toBeVisible();
+    await expect(
+      reopened.getByText('这段时间还没有手记，换一段看看。', { exact: true }),
+    ).toBeVisible();
     await expect(reopened.getByRole('status', { name: '正在生成回顾' })).toHaveCount(0);
     expect((await mockState(app))?.requests).toHaveLength(0);
     expect(cacheRows(dataDirectory)).toHaveLength(1);
@@ -540,7 +542,9 @@ test('真实桌面：回顾引导、自动生成、持久缓存、周期导航�
     await reopened.getByRole('button', { name: /^首页/ }).first().click();
     await openReview(reopened);
     await expect(reopened.locator('.period-trigger')).toHaveText(previousPeriod ?? '');
-    await expect(reopened.getByText('这段时间没有新手记。', { exact: true })).toBeVisible();
+    await expect(
+      reopened.getByText('这段时间还没有手记，换一段看看。', { exact: true }),
+    ).toBeVisible();
     expect((await mockState(app))?.requests).toHaveLength(0);
     const selectedList = await openPeriodPicker(reopened);
     await expect(selectedList.getByRole('option').first()).toBeFocused();
@@ -602,7 +606,9 @@ test('真实桌面：回顾引导、自动生成、持久缓存、周期导航�
     await reopened.getByRole('tab', { name: '按月', exact: true }).click();
     await expect(reopened.locator('.summary-text')).toContainText('本月集中记录');
     await choosePeriod(reopened, monthPeriods.previous);
-    await expect(reopened.getByText('这段时间没有新手记。', { exact: true })).toBeVisible();
+    await expect(
+      reopened.getByText('这段时间还没有手记，换一段看看。', { exact: true }),
+    ).toBeVisible();
     expect((await mockState(app))?.requests).toHaveLength(0);
 
     // Markdown 只格式化文字：供应商原始 HTML、图片与危险链接都不能获得执行能力。

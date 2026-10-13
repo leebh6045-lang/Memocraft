@@ -53,7 +53,7 @@ function softDeleteNote(noteId: string): void {
     .run(new Date().toISOString(), noteId);
 }
 
-describe('知识归纳与多重收录', () => {
+describe('主题归纳与多重收录', () => {
   it('新建归纳后可列出，初始没有收录手记', () => {
     const id = topic('前端开发');
     const list = topics.list();
@@ -114,7 +114,7 @@ describe('知识归纳与多重收录', () => {
     expect(topics.list()[0]?.revision).toBe(before);
   });
 
-  it('归纳内手记按手记创建时间倒序，与随手记一致', () => {
+  it('归纳内手记按手记创建时间倒序，与手记一致', () => {
     const id = topic('计算机基础');
     const older = note({ body: '先写的一条' });
     const newer = note({ body: '后写的一条' });

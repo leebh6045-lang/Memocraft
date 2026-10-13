@@ -3,6 +3,7 @@ import { CHANNELS, type MemocraftApi } from '../shared/contracts';
 
 // 桥接层仅转发白名单调用；输入校验与业务规则在主进程侧执行。
 const api: MemocraftApi = {
+  openHelp: () => ipcRenderer.invoke(CHANNELS.openHelp),
   ai: {
     loadSettings: () => ipcRenderer.invoke(CHANNELS.aiLoadSettings),
     saveModel: (model) => ipcRenderer.invoke(CHANNELS.aiSaveModel, model),

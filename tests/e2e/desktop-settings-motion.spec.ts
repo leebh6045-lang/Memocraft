@@ -328,8 +328,8 @@ test('真实桌面：设置分类丝滑切换、草稿和滚动保留、一级�
     const originalShell = await shellControls(page);
     expect(originalShell.map((control) => control.label)).toEqual([
       '首页',
-      '随手记',
-      '知识归纳',
+      '手记',
+      '主题归纳',
       '长期事务',
       '回顾',
       '搜索',
@@ -341,12 +341,14 @@ test('真实桌面：设置分类丝滑切换、草稿和滚动保留、一级�
     await openSettings(page);
     expectShellUnchanged(originalShell, await shellControls(page));
     await expect(page.getByRole('tablist', { name: '设置分类' }).getByRole('tab')).toHaveCount(4);
-    await expect(page.getByRole('heading', { name: 'AI 设置', exact: true })).not.toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /^(?:AI 服务|为 Memocraft 接入 AI)$/ }),
+    ).not.toBeVisible();
     await observeMotion(page, []);
 
     const toAi = await observeMotion(page, ['ai']);
     expectSmoothMotion(toAi, 'ai');
-    const panel = page.getByRole('region', { name: 'AI 设置', exact: true });
+    const panel = page.getByRole('region', { name: /^(?:AI 服务|为 Memocraft 接入 AI)$/ });
     const address = panel.locator('#ai-base-url');
     const key = panel.locator('#ai-key');
     await expect(address).toHaveValue(officialBaseUrl);
@@ -458,7 +460,7 @@ test('真实桌面：切出 AI 分类取消连接测试、迟到不回写、减�
     await mockConnection(app, true);
     await openSettings(page);
     await selectCategory(page, 'ai');
-    const panel = page.getByRole('region', { name: 'AI 设置', exact: true });
+    const panel = page.getByRole('region', { name: /^(?:AI 服务|为 Memocraft 接入 AI)$/ });
     await expect(panel.getByRole('button', { name: '测试连接', exact: true })).toBeEnabled();
     await panel.getByRole('button', { name: '测试连接', exact: true }).click();
     await expect.poll(async () => (await networkState(currentApp))?.length).toBe(1);

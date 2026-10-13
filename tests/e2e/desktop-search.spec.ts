@@ -50,7 +50,9 @@ test('真实桌面：全对象搜索、命中高亮与结果定位', async () =>
       .first()
       .click();
     const topicDialog = page.getByRole('dialog', { name: '新建归纳' });
-    await topicDialog.getByRole('textbox', { name: '标题', exact: true }).fill('检索归纳样例');
+    await topicDialog
+      .getByRole('textbox', { name: '标题（必填）', exact: true })
+      .fill('检索归纳样例');
     await topicDialog
       .getByRole('textbox', { name: '说明（可选）', exact: true })
       .fill('说明里带 SQLite 备份 关键词');
@@ -64,7 +66,9 @@ test('真实桌面：全对象搜索、命中高亮与结果定位', async () =>
       .first()
       .click();
     const threadDialog = page.getByRole('dialog', { name: '新建事务' });
-    await threadDialog.getByRole('textbox', { name: '标题', exact: true }).fill('检索事务样例');
+    await threadDialog
+      .getByRole('textbox', { name: '标题（必填）', exact: true })
+      .fill('检索事务样例');
     await threadDialog.getByRole('button', { name: '创建', exact: true }).click();
     // 基础信息在抽屉里填写，动态也在抽屉里记录。
     await page.getByRole('button', { name: '编辑基础信息' }).click();
@@ -135,7 +139,8 @@ test('真实桌面：全对象搜索、命中高亮与结果定位', async () =>
 
     // 打开手记结果：进入抽屉。
     await page
-      .getByRole('button', { name: /随手记/ })
+      .getByRole('navigation', { name: '主导航' })
+      .getByRole('button', { name: /^手记/ })
       .first()
       .click();
     await expect(page.locator('.page-enter-active')).toHaveCount(0);

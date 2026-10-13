@@ -41,7 +41,7 @@ const api = window.memocraft;
 // 普通浏览器不伪造保存能力；正式应用必须通过 preload 接入本地库。
 const libraryApi = imageApi(api);
 const library = useLibrary(libraryApi);
-// 列表缩略图的图片摘要：随手记集合补齐，读取失败只提示一次，列表与正文不受影响。
+// 列表缩略图的图片摘要：手记集合补齐，读取失败只提示一次，列表与正文不受影响。
 const noteImageIndex = useNoteImageIndex(libraryApi, (message) => announce(message));
 // 图集现场独立于正文编辑现场：改名字或删除图片不会触发手记版本冲突。
 // 图集变化后刷新摘要缓存，否则阅读流与连读会一直用加图之前的空结果。
@@ -95,8 +95,8 @@ const suggestionLoading = computed(
 );
 const pages = [
   { id: 'home', label: '首页', icon: 'home' },
-  { id: 'notes', label: '随手记', icon: 'notes' },
-  { id: 'topics', label: '知识归纳', icon: 'topics' },
+  { id: 'notes', label: '手记', icon: 'notes' },
+  { id: 'topics', label: '主题归纳', icon: 'topics' },
   { id: 'threads', label: '长期事务', icon: 'threads' },
 ] as const;
 /** 设置是辅助页面，不占主导航位置，因此不进 pages 数组。 */
@@ -169,6 +169,7 @@ function syncMotionPreference() {
 const closing = ref(false);
 const closingStore = ref(false);
 const navigating = ref(false);
+const openingHelp = ref(false);
 const banner = ref('');
 const saveFeedback = ref(false);
 const main = ref<HTMLElement | null>(null);
@@ -185,6 +186,20 @@ let removeNoticeListener: () => void = () => undefined;
 
 function announce(message: string, action?: { label: string; run: () => void }) {
   pushToast(message, { action });
+}
+
+// 帮助只打开系统浏览器，不走模块导航或改变编辑现场；等待时拦住重复点击。
+async function openHelp(): Promise<void> {
+  if (openingHelp.value || closing.value) return;
+  openingHelp.value = true;
+  try {
+    const result = await libraryApi.openHelp();
+    if (!result.ok) announce(result.error.message);
+  } catch {
+    announce('无法打开新手指南，请检查默认浏览器后重试。');
+  } finally {
+    openingHelp.value = false;
+  }
 }
 
 async function navigate(
@@ -235,7 +250,7 @@ async function save() {
   const saved = await library.commit();
   if (saved) {
     aiSuggestion.reset();
-    announce('已保存到随手记');
+    announce('已保存到手记');
     saveFeedback.value = true;
     clearTimeout(saveFeedbackTimer);
     saveFeedbackTimer = setTimeout(() => {
@@ -442,7 +457,7 @@ async function removeNoteFromTopic(topicId: string, noteId: string) {
   }
   topicError.value = '';
   notify({
-    message: '已从归纳移出，手记仍在随手记',
+    message: '已从归纳移出，手记仍保留在「手记」列表中',
     undo: () => {
       void topicState.addNotes(topicId, [noteId]);
     },
@@ -755,7 +770,7 @@ onBeforeUnmount(() => {
           @click="navigate('review')"
         >
           <AppIcon name="calendar" /><span class="label">回顾</span>
-          <AppIcon name="sparkle" class="review-ai-mark" colorful />
+          <AppIcon name="sparkle" class="review-ai-mark" />
         </button>
       </nav>
       <div class="nav-tools">
@@ -907,6 +922,16 @@ onBeforeUnmount(() => {
     <button
       type="button"
       class="corner-btn"
+      title="帮助"
+      aria-label="帮助（在浏览器打开新手指南）"
+      :disabled="openingHelp || closing"
+      @click="openHelp"
+    >
+      <AppIcon name="help" class="icon-s" />
+    </button>
+    <button
+      type="button"
+      class="corner-btn"
       :class="{ active: page === 'settings' }"
       title="设置"
       :aria-label="`设置（${shortcut},）`"
@@ -984,13 +1009,87 @@ onBeforeUnmount(() => {
   margin: 12px 0;
   background: linear-gradient(to right, transparent, var(--border), transparent);
 }
-.review-nav-item.active {
-  background: var(--surface-2);
+.review-nav-item {
+  /* 云团在内容下方，裁切略放大的装饰层；按钮自身的焦点轮廓仍显示在外侧。 */
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--bg);
 }
+.review-nav-item::before,
+.review-nav-item::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  transition: opacity var(--dur-3) ease;
+}
+/* 中央留白，颜色停在边缘；直接以径向渐变形成柔边，无需背景图或模糊滤镜。 */
+.review-nav-item::before {
+  opacity: var(--review-cloud-light);
+  background:
+    radial-gradient(
+      ellipse at 42% 45%,
+      rgba(255, 255, 255, 0.98) 0%,
+      rgba(255, 255, 255, 0.65) 30%,
+      transparent 66%
+    ),
+    radial-gradient(ellipse at 98% 14%, rgba(155, 200, 238, 0.43), transparent 42%),
+    radial-gradient(ellipse at 89% 116%, rgba(247, 209, 191, 0.35), transparent 42%), #edf5fb;
+}
+.review-nav-item::after {
+  opacity: var(--review-cloud-dark);
+  background:
+    radial-gradient(
+      ellipse at 42% 45%,
+      rgba(120, 160, 195, 0.98) 0%,
+      rgba(120, 160, 195, 0.65) 30%,
+      transparent 66%
+    ),
+    radial-gradient(ellipse at 98% 14%, rgba(91, 140, 188, 0.43), transparent 42%),
+    radial-gradient(ellipse at 89% 116%, rgba(176, 131, 127, 0.35), transparent 42%), #253442;
+}
+.review-nav-item:hover:not(:disabled)::before,
+.review-nav-item.active::before {
+  opacity: var(--review-cloud-light-emphasis);
+}
+.review-nav-item:hover:not(:disabled)::after,
+.review-nav-item.active::after {
+  opacity: var(--review-cloud-dark-emphasis);
+}
+.review-nav-item:hover:not(:disabled) {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.review-nav-item.active {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+/* active 只由当前页面决定：选中回顾才流动，切页移除类后立即回到静态。 */
+.review-nav-item.active::before,
+.review-nav-item.active::after {
+  animation: review-cloud-flow 10s ease-in-out infinite alternate;
+}
+@keyframes review-cloud-flow {
+  from {
+    transform: translateX(-1.2%) scale(1.03);
+  }
+  to {
+    transform: translateX(1.2%) scale(1.03);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .review-nav-item.active::before,
+  .review-nav-item.active::after {
+    animation: none;
+    transform: none;
+  }
+}
+/* 回顾 AI 标识使用固定淡蓝，深浅主题保持一致。 */
 .review-ai-mark {
   margin-left: auto;
   flex-shrink: 0;
   stroke-width: 2;
+  color: #8fb0d6;
 }
 .app-banner {
   position: fixed;

@@ -75,7 +75,7 @@ function editRevision(input: unknown): number {
 
 function category(input: unknown): NoteCategory {
   const match = NOTE_CATEGORIES.find((item) => item.value === input);
-  if (!match) invalid('请选择收获、待办、完成或杂项。');
+  if (!match) invalid(`请选择${NOTE_CATEGORIES.map((item) => item.label).join('、')}。`);
   return match.value;
 }
 

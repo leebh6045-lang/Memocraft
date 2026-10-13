@@ -4,4 +4,4 @@
  * 版本号必须由这里显式声明，不能让调用方按「迁移目录里的文件个数」推算：
  * 目录少一个文件时那种做法会把用户库误判成「来自更新版本」，把安装问题伪装成数据问题。
  */
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;

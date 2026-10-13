@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { NOTE_CATEGORIES } from '../../src/domain/note';
 import { describe, expect, it, vi } from 'vitest';
 import {
   AiPeriodSummaryService,
@@ -99,6 +100,30 @@ describe('周期总结采样与输出', () => {
     expect(result).toHaveLength(20);
     for (const category of ['insight', 'todo', 'done', 'misc'])
       expect(result.filter((item) => item.category === category)).toHaveLength(5);
+  });
+  it('五类轮流采样覆盖较旧的思绪，各取四条且恢复时间与 ID 倒序', () => {
+    const notes = NOTE_CATEGORIES.flatMap((category, categoryIndex) =>
+      Array.from({ length: 10 }, (_, index) => ({
+        ...note(categoryIndex * 10 + index, category.value),
+        createdAt:
+          category.value === 'thought' ? '2026-10-05T10:00:00.000Z' : '2026-10-06T10:00:00.000Z',
+      })),
+    );
+    const result = samplePeriodNotes(notes);
+    expect(result).toHaveLength(20);
+    for (const category of NOTE_CATEGORIES)
+      expect(result.filter((item) => item.category === category.value)).toHaveLength(4);
+    expect(result.slice(-4).map((item) => item.id)).toEqual(['019', '018', '017', '016']);
+    expect(samplePeriodNotes([...notes].reverse())).toEqual(result);
+  });
+  it('缺类时仍受每类五条限制，不强制凑满二十条', () => {
+    const result = samplePeriodNotes([
+      ...Array.from({ length: 25 }, (_, index) => note(index, 'thought')),
+      note(30, 'misc'),
+    ]);
+    expect(result.filter((item) => item.category === 'thought')).toHaveLength(5);
+    expect(result.filter((item) => item.category === 'misc')).toHaveLength(1);
+    expect(result).toHaveLength(6);
   });
   it('单点摘要超长只截断并附省略号，同时保留该点来源，空建议数组合法', () => {
     const source = note();

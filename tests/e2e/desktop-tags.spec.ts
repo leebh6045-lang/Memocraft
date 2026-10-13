@@ -43,13 +43,13 @@ test('真实桌面：选择标签抽屉、卡片标签胶囊与「已收录」�
     await page.getByRole('button', { name: '＋ 选择标签' }).click();
     const drawer = page.getByRole('dialog', { name: '选择标签' });
     await expect(drawer).toBeVisible();
-    await expect(drawer.getByText('还没有选标签，下面点一下即可。')).toBeVisible();
+    await expect(drawer.getByText('选几个标签，也可以先跳过。')).toBeVisible();
 
     // 跨组点两个预设标签：点标签不关抽屉，可以连续多选。
     await drawer.getByRole('button', { name: '踩坑', exact: true }).click();
     await drawer.getByRole('button', { name: '方法流程', exact: true }).click();
     await expect(drawer).toBeVisible();
-    await expect(drawer.getByText('已选 2 个 · 预设与自定义标签等价')).toBeVisible();
+    await expect(drawer.getByText('已选 2 个 · 也可以自己加标签')).toBeVisible();
     await expect(drawer.getByRole('button', { name: '踩坑', exact: true })).toHaveAttribute(
       'aria-pressed',
       'true',
@@ -59,13 +59,13 @@ test('真实桌面：选择标签抽屉、卡片标签胶囊与「已收录」�
     const customInput = drawer.getByRole('textbox', { name: '自定义标签' });
     await customInput.fill('sqlite, 备份');
     await customInput.press('Enter');
-    await expect(drawer.getByText('已选 4 个 · 预设与自定义标签等价')).toBeVisible();
+    await expect(drawer.getByText('已选 4 个 · 也可以自己加标签')).toBeVisible();
 
     // 再点一次取消一个预设标签。
     await drawer.getByRole('button', { name: '方法流程', exact: true }).click();
-    await expect(drawer.getByText('已选 3 个 · 预设与自定义标签等价')).toBeVisible();
+    await expect(drawer.getByText('已选 3 个 · 也可以自己加标签')).toBeVisible();
     await drawer.getByRole('button', { name: '方法流程', exact: true }).click();
-    await expect(drawer.getByText('已选 4 个 · 预设与自定义标签等价')).toBeVisible();
+    await expect(drawer.getByText('已选 4 个 · 也可以自己加标签')).toBeVisible();
 
     // 完成：抽屉关闭，补充区显示已选胶囊，可以直接 × 移除。
     await drawer.getByRole('button', { name: '完成' }).click();
@@ -82,10 +82,11 @@ test('真实桌面：选择标签抽屉、卡片标签胶囊与「已收录」�
     // 卡片：三个标签胶囊，「已收录」只跟一个归纳时写「已收录」而不是 ×1。
     const openNotes = async () => {
       await page
-        .getByRole('button', { name: /随手记/ })
+        .getByRole('navigation', { name: '主导航' })
+        .getByRole('button', { name: /^手记/ })
         .first()
         .click();
-      await expect(page.getByRole('heading', { name: '随手记', exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { name: '手记', exact: true })).toBeVisible();
       await expect(page.locator('.page-enter-active')).toHaveCount(0);
     };
     await openNotes();
@@ -107,7 +108,7 @@ test('真实桌面：选择标签抽屉、卡片标签胶囊与「已收录」�
         .click();
       await page
         .getByRole('dialog', { name: '新建归纳' })
-        .getByRole('textbox', { name: '标题', exact: true })
+        .getByRole('textbox', { name: '标题（必填）', exact: true })
         .fill(topicTitle);
       await page
         .getByRole('dialog', { name: '新建归纳' })
@@ -162,7 +163,8 @@ test('真实桌面：选择标签抽屉、卡片标签胶囊与「已收录」�
     reopened.on('pageerror', (error) => errors.push(error.message));
     await expect(reopened.getByRole('textbox', { name: '手记正文', exact: true })).toBeVisible();
     await reopened
-      .getByRole('button', { name: /随手记/ })
+      .getByRole('navigation', { name: '主导航' })
+      .getByRole('button', { name: /^手记/ })
       .first()
       .click();
     const reopenedCard = reopened.locator('.card').filter({ hasText: '证书链排查记录' });

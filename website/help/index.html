@@ -1,0 +1,1856 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="用几分钟认识创忆工坊：写下手记、整理归纳、记录事务，再找回你的想法。"
+    />
+    <meta name="theme-color" content="#fcfcfb" />
+    <title>新手指南 · Memocraft 创忆工坊</title>
+    <style>
+      /* 单文件原型沿用应用的暖白与蓝色；所有演示只保留在当前页面内。 */
+      :root {
+        color-scheme: light;
+        --page: #fcfcfb;
+        --paper: #fff;
+        --stage: #f5f4f1;
+        --ink: #25242a;
+        --muted: #706f76;
+        --faint: #919098;
+        --line: #e7e5e0;
+        --blue: #3b5b7c;
+        --blue-soft: #eaf0f6;
+        --green: #4f8a63;
+        --purple: #8a6c9c;
+        --amber: #b8862b;
+        --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI',
+          sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+        scroll-padding-top: 88px;
+      }
+      body {
+        margin: 0;
+        background: var(--page);
+        color: var(--ink);
+        font-size: 15px;
+        line-height: 1.75;
+        -webkit-font-smoothing: antialiased;
+      }
+      button,
+      input,
+      textarea {
+        font: inherit;
+        color: inherit;
+      }
+      button {
+        cursor: pointer;
+      }
+      button:disabled {
+        cursor: default;
+        opacity: 0.6;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      button,
+      a,
+      input,
+      textarea,
+      summary {
+        -webkit-tap-highlight-color: transparent;
+      }
+      :focus-visible {
+        outline: 2px solid var(--blue);
+        outline-offset: 4px;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      h1,
+      h2,
+      h3,
+      p,
+      figure {
+        margin: 0;
+      }
+      svg {
+        display: block;
+      }
+      .icon {
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .sprite {
+        position: absolute;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+      }
+      .container {
+        width: min(1080px, calc(100% - 96px));
+        margin: 0 auto;
+      }
+      .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: rgba(252, 252, 251, 0.94);
+        backdrop-filter: blur(12px);
+      }
+      .header-inner {
+        min-height: 76px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 24px;
+        border-bottom: 1px solid var(--line);
+      }
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 15px;
+        font-weight: 650;
+        letter-spacing: -0.3px;
+      }
+      .brand-mark {
+        width: 28px;
+        height: 28px;
+      }
+      .brand small {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 400;
+        margin-left: 4px;
+      }
+      .header-nav {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .header-nav a {
+        transition: color 140ms ease;
+      }
+      .header-nav a:hover {
+        color: var(--blue);
+      }
+      .guide-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .guide-label .icon {
+        width: 15px;
+        height: 15px;
+      }
+      .hero {
+        padding: 86px 0 42px;
+        text-align: center;
+      }
+      .eyebrow {
+        color: var(--blue);
+        font-size: 12px;
+        letter-spacing: 2px;
+      }
+      .hero h1 {
+        font-size: clamp(36px, 4.6vw, 52px);
+        line-height: 1.34;
+        font-weight: 650;
+        letter-spacing: -1.8px;
+        margin: 20px 0 20px;
+      }
+      .hero h1 span {
+        color: var(--blue);
+      }
+      .hero-intro {
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.95;
+      }
+      .hero-meta {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        margin-top: 26px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .hero-meta i {
+        width: 3px;
+        height: 3px;
+        border-radius: 50%;
+        background: var(--faint);
+      }
+      .hero-down {
+        display: inline-flex;
+        margin-top: 28px;
+        padding: 8px;
+        color: var(--blue);
+      }
+      .lesson {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 88px;
+        align-items: center;
+        padding: 56px 0;
+        scroll-margin-top: 20px;
+      }
+      .lesson-copy {
+        order: 2;
+        max-width: 385px;
+        justify-self: center;
+      }
+      .demo {
+        order: 1;
+        min-width: 0;
+        width: 100%;
+      }
+      .lesson[data-demo='right'] .lesson-copy {
+        order: 1;
+      }
+      .lesson[data-demo='right'] .demo {
+        order: 2;
+      }
+      .step-label {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: var(--blue);
+        font-size: 12px;
+        letter-spacing: 1px;
+        margin-bottom: 16px;
+      }
+      .step-label span {
+        font-variant-numeric: tabular-nums;
+      }
+      .step-label::after {
+        content: '';
+        width: 34px;
+        height: 1px;
+        background: #c6d3df;
+      }
+      .lesson h2 {
+        font-size: 29px;
+        line-height: 1.5;
+        font-weight: 600;
+        letter-spacing: -0.8px;
+        margin-bottom: 18px;
+      }
+      .lesson-copy > p {
+        color: var(--muted);
+        line-height: 1.95;
+      }
+      .lesson-copy strong {
+        color: var(--ink);
+        font-weight: 500;
+      }
+      .instruction {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 22px;
+        font-size: 12px;
+        color: var(--blue);
+      }
+      .instruction .icon {
+        width: 15px;
+        height: 15px;
+      }
+      .fine-note {
+        border-left: 2px solid var(--line);
+        padding-left: 13px;
+        margin-top: 22px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.85;
+      }
+      .demo-stage {
+        background: var(--stage);
+        padding: 24px;
+        border-radius: 16px;
+        min-height: 345px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .mini-window {
+        width: 100%;
+        background: var(--paper);
+        border: 1px solid #e5e2dc;
+        border-radius: 11px;
+        box-shadow:
+          0 3px 6px rgba(35, 35, 40, 0.025),
+          0 12px 32px rgba(35, 35, 40, 0.035);
+        overflow: hidden;
+      }
+      .window-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        min-height: 37px;
+        padding: 0 14px;
+        border-bottom: 1px solid var(--line);
+        font-size: 10px;
+        color: var(--muted);
+      }
+      .window-dots {
+        display: flex;
+        gap: 5px;
+      }
+      .window-dots i {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #d9d6ce;
+      }
+      .window-brand {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .window-brand .icon {
+        width: 12px;
+        height: 12px;
+      }
+      .mini-content {
+        padding: 22px;
+      }
+      .mini-title {
+        font-weight: 600;
+        font-size: 17px;
+        line-height: 1.5;
+      }
+      .mini-sub {
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .demo figcaption {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        margin: 13px 4px 0;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .caption-action {
+        color: var(--blue);
+      }
+      .editor {
+        margin-top: 17px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        overflow: hidden;
+      }
+      .note-input {
+        width: 100%;
+        min-height: 95px;
+        resize: vertical;
+        padding: 15px;
+        border: 0;
+        background: transparent;
+        font-size: 13px;
+        line-height: 1.9;
+      }
+      .editor-footer {
+        padding: 10px 12px;
+        border-top: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 9px;
+      }
+      .category-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .category-dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--blue);
+      }
+      .small-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        border: 0;
+        border-radius: 5px;
+        padding: 7px 11px;
+        background: var(--blue);
+        color: #fff;
+        font-size: 11px;
+        white-space: nowrap;
+        transition:
+          background 140ms ease,
+          transform 140ms ease;
+      }
+      .small-button:hover {
+        background: #294763;
+      }
+      .small-button:active {
+        transform: translateY(1px);
+      }
+      .small-button .icon {
+        width: 13px;
+        height: 13px;
+      }
+      .ghost-button {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+      .ghost-button:hover {
+        background: #dce6f0;
+      }
+      .text-button {
+        border: 0;
+        padding: 3px 0;
+        color: var(--blue);
+        background: transparent;
+        font-size: 11px;
+      }
+      .demo-status {
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 11px;
+        min-height: 20px;
+      }
+      .saved-note {
+        margin-top: 14px;
+        padding: 12px 14px;
+        border: 1px solid #d8e4da;
+        border-radius: 7px;
+        background: #f6faf7;
+        animation: appear 280ms var(--ease);
+      }
+      .saved-note-label {
+        color: var(--green);
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        font-size: 10px;
+        margin-bottom: 5px;
+      }
+      .saved-note-label .icon {
+        width: 12px;
+        height: 12px;
+      }
+      .saved-note-text {
+        font-size: 12px;
+        line-height: 1.8;
+        overflow-wrap: anywhere;
+        max-height: 96px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+      }
+      .saved-note .text-button {
+        margin-top: 6px;
+      }
+      .category-select {
+        display: flex;
+        flex-wrap: wrap;
+        padding: 4px;
+        background: var(--stage);
+        border-radius: 7px;
+        border: 0;
+        margin: 18px 0;
+        gap: 3px;
+        min-width: 0;
+      }
+      .category-select label {
+        flex: 1 0 46px;
+        position: relative;
+        text-align: center;
+        cursor: pointer;
+      }
+      .category-select input {
+        position: absolute;
+        opacity: 0;
+        width: 1px;
+        height: 1px;
+      }
+      .category-select span {
+        display: block;
+        padding: 7px 4px;
+        border-radius: 5px;
+        font-size: 11px;
+        color: var(--muted);
+        transition:
+          background 240ms ease,
+          box-shadow 240ms ease,
+          color 240ms ease;
+      }
+      .category-select input:checked + span {
+        background: var(--paper);
+        color: var(--blue);
+        box-shadow: 0 1px 4px rgba(35, 35, 40, 0.08);
+      }
+      .category-select input:focus-visible + span {
+        outline: 2px solid var(--blue);
+        outline-offset: 2px;
+      }
+      .example-note {
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      .example-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 10px;
+        color: var(--muted);
+        margin-bottom: 9px;
+      }
+      .example-heading .category-tag {
+        color: var(--blue);
+      }
+      .example-note h3 {
+        font-size: 13px;
+        font-weight: 500;
+        margin-bottom: 6px;
+      }
+      .example-note p {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .category-description {
+        margin-top: 12px;
+        min-height: 35px;
+        font-size: 11px;
+        color: var(--muted);
+        line-height: 1.8;
+      }
+      .topic-heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+        margin-bottom: 17px;
+      }
+      .topic-heading .small-button {
+        padding: 6px 8px;
+        margin-top: 3px;
+      }
+      .topic-notes {
+        border-top: 1px solid var(--line);
+      }
+      .topic-note {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 11px 0;
+        border-bottom: 1px solid var(--line);
+        animation: appear 280ms var(--ease);
+      }
+      .topic-note > .icon {
+        width: 15px;
+        height: 15px;
+        color: var(--blue);
+      }
+      .topic-note h3 {
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .topic-note p {
+        font-size: 10px;
+        color: var(--muted);
+      }
+      .topic-count {
+        font-size: 10px;
+        color: var(--muted);
+        margin-top: 12px;
+      }
+      .selection {
+        margin-top: 14px;
+        border: 1px solid #d9e2ec;
+        background: #f7f9fc;
+        border-radius: 7px;
+        padding: 12px;
+        animation: appear 200ms var(--ease);
+      }
+      .selection h3 {
+        font-size: 12px;
+        font-weight: 500;
+        margin-bottom: 8px;
+      }
+      .selection-choice {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 11px;
+        margin-bottom: 10px;
+      }
+      .selection-choice input {
+        accent-color: var(--blue);
+      }
+      .selection-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+      }
+      .thread-overview {
+        margin: 13px 0 18px;
+        padding: 8px 10px;
+        border-radius: 5px;
+        background: var(--stage);
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .timeline {
+        padding-left: 11px;
+      }
+      .timeline-item {
+        position: relative;
+        padding: 0 0 18px 20px;
+        border-left: 1px solid #d9dde3;
+        animation: appear 280ms var(--ease);
+      }
+      .timeline-item:last-child {
+        padding-bottom: 0;
+      }
+      .timeline-item::before {
+        content: '';
+        position: absolute;
+        width: 6px;
+        height: 6px;
+        background: var(--paper);
+        border: 1.5px solid var(--blue);
+        border-radius: 50%;
+        left: -3.5px;
+        top: 6px;
+      }
+      .timeline-item time {
+        color: var(--muted);
+        font-size: 10px;
+      }
+      .timeline-item h3 {
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .timeline-action {
+        margin-top: 17px;
+      }
+      .timeline-form {
+        padding-top: 12px;
+      }
+      .timeline-form label {
+        display: block;
+        font-size: 11px;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+      .timeline-form input {
+        width: 100%;
+        border: 1px solid var(--line);
+        padding: 7px 9px;
+        border-radius: 5px;
+        background: var(--paper);
+        font-size: 12px;
+      }
+      .timeline-form .selection-actions {
+        margin-top: 10px;
+      }
+      .search-content {
+        padding: 20px 18px;
+      }
+      .search-box {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 14px;
+      }
+      .search-box .icon {
+        width: 17px;
+        height: 17px;
+        color: var(--blue);
+      }
+      .search-box input {
+        min-width: 0;
+        width: 100%;
+        border: 0;
+        font-size: 15px;
+        background: transparent;
+      }
+      .search-box kbd {
+        border: 1px solid var(--line);
+        padding: 0 5px;
+        border-radius: 3px;
+        color: var(--muted);
+        font-size: 9px;
+        white-space: nowrap;
+      }
+      .search-summary {
+        padding: 14px 0 4px;
+        font-size: 10px;
+        color: var(--muted);
+      }
+      .search-result {
+        display: flex;
+        width: 100%;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px 9px;
+        border: 0;
+        border-radius: 5px;
+        text-align: left;
+        background: transparent;
+        transition: background 140ms ease;
+      }
+      .search-result:hover {
+        background: var(--stage);
+      }
+      .search-kind {
+        font-size: 10px;
+        color: var(--blue);
+        background: var(--blue-soft);
+        border-radius: 3px;
+        padding: 1px 5px;
+        white-space: nowrap;
+        margin-top: 1px;
+      }
+      .search-result strong {
+        font-size: 12px;
+        font-weight: 500;
+        display: block;
+      }
+      .search-result small {
+        font-size: 10px;
+        color: var(--muted);
+        display: block;
+        line-height: 1.7;
+        margin-top: 3px;
+      }
+      .search-help {
+        font-size: 10px;
+        color: var(--muted);
+        margin-top: 14px;
+        border-top: 1px solid var(--line);
+        padding-top: 10px;
+      }
+      .search-detail {
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 14px;
+        margin-top: 12px;
+        animation: appear 240ms var(--ease);
+      }
+      .search-detail h3 {
+        font-size: 13px;
+        font-weight: 500;
+        margin: 5px 0 8px;
+      }
+      .search-detail p {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .backup-choices {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin: 18px 0 13px;
+      }
+      .backup-choice {
+        text-align: left;
+        background: transparent;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 12px;
+        transition:
+          background 200ms ease,
+          border-color 200ms ease;
+      }
+      .backup-choice[aria-pressed='true'] {
+        background: var(--blue-soft);
+        border-color: #cad8e6;
+      }
+      .backup-choice .icon {
+        color: var(--blue);
+        margin-bottom: 8px;
+      }
+      .backup-choice strong {
+        font-size: 12px;
+        font-weight: 500;
+        display: block;
+      }
+      .backup-choice small {
+        color: var(--muted);
+        font-size: 10px;
+        display: block;
+      }
+      .backup-package {
+        padding: 15px;
+        background: var(--stage);
+        border-radius: 7px;
+      }
+      .package-title {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 11px;
+        font-weight: 500;
+        margin-bottom: 10px;
+      }
+      .package-title .icon {
+        width: 15px;
+        height: 15px;
+        color: var(--blue);
+      }
+      .package-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .package-list span {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+        padding: 4px 7px;
+        background: var(--paper);
+        border-radius: 4px;
+        font-size: 10px;
+        color: var(--muted);
+      }
+      .package-list .icon {
+        width: 11px;
+        height: 11px;
+      }
+      .backup-summary {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 12px;
+        min-height: 37px;
+      }
+      .afterword {
+        max-width: 700px;
+        margin: 62px auto 0;
+        padding-top: 48px;
+        border-top: 1px solid var(--line);
+      }
+      .afterword h2 {
+        font-size: 23px;
+        font-weight: 600;
+        letter-spacing: -0.4px;
+        text-align: center;
+        margin-bottom: 27px;
+      }
+      .faq {
+        border-bottom: 1px solid var(--line);
+      }
+      .faq summary {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 20px;
+        padding: 18px 0;
+        cursor: pointer;
+        list-style: none;
+        font-size: 14px;
+      }
+      .faq summary::-webkit-details-marker {
+        display: none;
+      }
+      .faq summary .icon {
+        width: 14px;
+        height: 14px;
+        color: var(--muted);
+        transition: transform 200ms ease;
+      }
+      .faq[open] summary .icon {
+        transform: rotate(45deg);
+      }
+      .faq p {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.95;
+        padding: 0 24px 21px 0;
+      }
+      .ending {
+        padding: 62px 0 56px;
+        text-align: center;
+      }
+      .ending p {
+        font-size: 19px;
+        line-height: 1.8;
+        letter-spacing: -0.3px;
+      }
+      .ending small {
+        color: var(--muted);
+        font-size: 12px;
+        display: block;
+        margin-top: 10px;
+      }
+      .footer-inner {
+        border-top: 1px solid var(--line);
+        padding: 23px 0;
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .footer-inner a {
+        color: var(--blue);
+      }
+      /* 默认不隐藏内容；仅在支持观察器且未要求减少动态时启用一次入场。 */
+      .will-reveal {
+        opacity: 0;
+        transform: translateY(16px);
+        transition:
+          opacity 650ms var(--ease),
+          transform 650ms var(--ease);
+      }
+      .will-reveal.is-visible {
+        opacity: 1;
+        transform: none;
+      }
+      @keyframes appear {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @media (max-width: 1050px) {
+        .container {
+          width: calc(100% - 64px);
+        }
+        .lesson {
+          gap: 48px;
+        }
+        .lesson h2 {
+          font-size: 26px;
+        }
+        .demo-stage {
+          padding: 19px;
+        }
+        .mini-content {
+          padding: 18px;
+        }
+      }
+      @media (max-width: 780px) {
+        .container {
+          width: min(540px, calc(100% - 48px));
+        }
+        .header-inner {
+          min-height: 68px;
+        }
+        .brand small,
+        .header-nav a {
+          display: none;
+        }
+        .header-nav {
+          gap: 0;
+        }
+        .hero {
+          padding: 62px 0 23px;
+        }
+        .hero h1 {
+          letter-spacing: -1px;
+        }
+        .hero-intro {
+          font-size: 14px;
+        }
+        .hero-meta {
+          flex-wrap: wrap;
+          gap: 8px;
+          font-size: 11px;
+        }
+        .lesson {
+          grid-template-columns: minmax(0, 1fr);
+          gap: 26px;
+          padding: 41px 0;
+        }
+        .lesson .lesson-copy,
+        .lesson[data-demo='right'] .lesson-copy {
+          order: 1;
+          max-width: none;
+          justify-self: stretch;
+        }
+        .lesson .demo,
+        .lesson[data-demo='right'] .demo {
+          order: 2;
+        }
+        .lesson h2 {
+          font-size: 27px;
+          margin-bottom: 12px;
+        }
+        .step-label {
+          margin-bottom: 11px;
+        }
+        .fine-note {
+          margin-top: 16px;
+        }
+        .instruction {
+          margin-top: 15px;
+        }
+        .demo-stage {
+          min-height: 0;
+          padding: 24px;
+        }
+        .afterword {
+          margin-top: 32px;
+          padding-top: 36px;
+        }
+        .ending {
+          padding: 48px 0;
+        }
+      }
+      @media (max-width: 400px) {
+        .container {
+          width: calc(100% - 36px);
+        }
+        .brand {
+          gap: 6px;
+          font-size: 14px;
+        }
+        .guide-label {
+          font-size: 11px;
+        }
+        .demo-stage {
+          padding: 14px;
+        }
+        .mini-content {
+          padding: 15px;
+        }
+        .topic-heading {
+          flex-wrap: wrap;
+        }
+        .search-box kbd {
+          display: none;
+        }
+        .footer-inner {
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        .demo figcaption {
+          font-size: 10px;
+          gap: 8px;
+        }
+      }
+      @media (pointer: coarse) {
+        .small-button,
+        .text-button,
+        .category-select span,
+        .backup-choice,
+        .header-nav a,
+        .hero-down {
+          min-height: 44px;
+        }
+        .selection-choice {
+          min-height: 44px;
+        }
+        .note-input,
+        .timeline-form input,
+        .search-box input {
+          font-size: 16px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+        *,
+        *::before,
+        *::after {
+          animation: none !important;
+          transition: none !important;
+        }
+        .will-reveal {
+          opacity: 1;
+          transform: none;
+        }
+      }
+    </style>
+  </head>
+  <body id="top">
+    <svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <symbol id="i-note" viewBox="0 0 24 24">
+        <path
+          d="M13 3H6a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M2 7h4M2 11h4M2 15h4M2 19h4M19 2l3 3-8 8-4 1 1-4Z"
+        />
+      </symbol>
+      <symbol id="i-search" viewBox="0 0 24 24">
+        <circle cx="10.5" cy="10.5" r="7.5" />
+        <path d="m16 16 5 5" />
+      </symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4 10-10" /></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M12 4v16m-6-6 6 6 6-6" /></symbol>
+      <symbol id="i-help" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M9.8 8.6a2.4 2.4 0 1 1 4 2.5c-1.2.7-1.8 1.1-1.8 2.4M12 17h.01" />
+      </symbol>
+      <symbol id="i-pointer" viewBox="0 0 24 24">
+        <path d="m5 3 3 16 4-5 6-1L5 3Zm7 11 4 6" />
+      </symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7V5h6l2 2h10v13H3V7Z" /></symbol>
+      <symbol id="i-export" viewBox="0 0 24 24">
+        <path d="M5 12v8h14v-8M12 15V3m-4 4 4-4 4 4" />
+      </symbol>
+      <symbol id="i-image" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <circle cx="8" cy="8" r="1" />
+        <path d="m3 17 6-6 4 4 3-3 5 5" />
+      </symbol>
+      <symbol id="i-link" viewBox="0 0 24 24">
+        <path
+          d="m10 14 4-4M8 16l-2 2a4 4 0 0 1-6-6l5-5a4 4 0 0 1 6 0M16 8l2-2a4 4 0 0 1 6 6l-5 5a4 4 0 0 1-6 0"
+          transform="translate(1 0) scale(.9)"
+        />
+      </symbol>
+    </svg>
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="#top" aria-label="Memocraft 创忆工坊，回到顶部">
+          <svg class="brand-mark" viewBox="90 100 340 310" aria-hidden="true">
+            <path d="M112 128 184 224V376H112Z" fill="#202a44" />
+            <path d="M112 128H184L256 224V320L184 224Z" fill="#d8c4a5" />
+            <path d="m256 224 72-96h72l-72 96-72 96Z" fill="#f4e8d2" />
+            <path d="m328 224 72-96v248l-36-22-36 22Z" fill="#202a44" />
+          </svg>
+          Memocraft <small>创忆工坊</small>
+        </a>
+        <nav class="header-nav" aria-label="教程导航">
+          <a href="#write">开始记录</a><a href="#organize">慢慢整理</a><a href="#find">再次找到</a>
+          <span class="guide-label"
+            ><svg class="icon" aria-hidden="true"><use href="#i-help" /></svg>新手指南</span
+          >
+        </nav>
+      </div>
+    </header>
+    <main class="container">
+      <section class="hero" aria-labelledby="hero-title">
+        <p class="eyebrow">欢迎来到创忆工坊</p>
+        <h1 id="hero-title">先记下来，<br />再慢慢<span>连起来。</span></h1>
+        <p class="hero-intro">
+          一个念头、一点收获，或一件正在推进的事。<br />从第一条手记开始，给它们一个安稳的地方。
+        </p>
+        <div class="hero-meta">
+          <span>约 3 分钟</span><i aria-hidden="true"></i
+          ><span>下方操作均为示例，不会修改应用里的数据</span>
+        </div>
+        <a class="hero-down" href="#write" aria-label="开始阅读教程"
+          ><svg class="icon" aria-hidden="true"><use href="#i-arrow" /></svg
+        ></a>
+      </section>
+
+      <section class="lesson" id="write" aria-labelledby="write-title">
+        <div class="lesson-copy">
+          <div class="step-label"><span>01</span> 开始记录</div>
+          <h2 id="write-title">想到什么，<br />就先写下来。</h2>
+          <p>
+            打开首页，直接输入正文，再点<strong>「保存手记」</strong>。不用先起标题，也不用先想好标签。
+          </p>
+          <p class="fine-note">
+            草稿会自动保存，方便下次继续写。点「保存手记」后，它才会出现在手记和搜索里。
+          </p>
+          <div class="instruction">
+            <svg class="icon" aria-hidden="true"><use href="#i-pointer" /></svg
+            >试着修改文字，再保存这条示例手记
+          </div>
+        </div>
+        <figure class="demo">
+          <div class="demo-stage">
+            <div class="mini-window">
+              <div class="window-bar">
+                <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span
+                ><span class="window-brand">Memocraft / 首页</span><span>演示</span>
+              </div>
+              <div class="mini-content">
+                <h3 class="mini-title">新手记</h3>
+                <p class="mini-sub">只需写下正文，其他都可以稍后补。</p>
+                <form id="write-form" class="editor">
+                  <textarea
+                    class="note-input"
+                    id="note-body"
+                    aria-label="示例手记正文"
+                    maxlength="400"
+                    placeholder="现在想到什么……"
+                  >
+今天学到：不必等想法成熟，先把它记下来。</textarea>
+                  <div class="editor-footer">
+                    <span class="category-tag"
+                      ><i class="category-dot" aria-hidden="true"></i>收获</span
+                    ><button class="small-button" id="save-note" type="submit">保存手记</button>
+                  </div>
+                </form>
+                <p class="demo-status" id="write-status" role="status">这是一条示例，试试看。</p>
+                <div class="saved-note" id="saved-note" hidden>
+                  <div class="saved-note-label">
+                    <svg class="icon" aria-hidden="true"><use href="#i-check" /></svg
+                    >已出现在示例手记中
+                  </div>
+                  <p class="saved-note-text" id="saved-note-text"></p>
+                  <button type="button" class="text-button" id="write-again">再试一次</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <span>交互演示 · 首页</span><span class="caption-action">写下 → 保存 → 成为手记</span>
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="lesson" data-demo="right" id="categories" aria-labelledby="categories-title">
+        <div class="lesson-copy">
+          <div class="step-label"><span>02</span> 分清用途</div>
+          <h2 id="categories-title">一条手记，<br />一个合适的分类。</h2>
+          <p>
+            <strong>收获、思绪、待办、完成、其他</strong
+            >，对应不同的记录用途。新手记默认选「收获」，也可以随时改选。
+          </p>
+          <p class="fine-note">
+            事情做完了，把「待办」改为「完成」就好。标签用来补充主题，比如「读书」或「工作」。
+          </p>
+          <div class="instruction">
+            <svg class="icon" aria-hidden="true"><use href="#i-pointer" /></svg
+            >切换分类，看看这条记录会放在哪里
+          </div>
+        </div>
+        <figure class="demo">
+          <div class="demo-stage">
+            <div class="mini-window">
+              <div class="window-bar">
+                <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span
+                ><span>Memocraft / 手记</span><span>演示</span>
+              </div>
+              <div class="mini-content">
+                <h3 class="mini-title">给记录一个位置</h3>
+                <p class="mini-sub">每条手记只有一个分类。</p>
+                <fieldset class="category-select" aria-label="示例手记分类">
+                  <label
+                    ><input type="radio" name="category" value="收获" /><span>收获</span></label
+                  >
+                  <label
+                    ><input type="radio" name="category" value="思绪" /><span>思绪</span></label
+                  >
+                  <label
+                    ><input type="radio" name="category" value="待办" checked /><span
+                      >待办</span
+                    ></label
+                  >
+                  <label
+                    ><input type="radio" name="category" value="完成" /><span>完成</span></label
+                  >
+                  <label
+                    ><input type="radio" name="category" value="其他" /><span>其他</span></label
+                  >
+                </fieldset>
+                <div class="example-note">
+                  <div class="example-heading">
+                    <span class="category-tag" id="category-badge"
+                      ><i
+                        class="category-dot"
+                        id="category-dot"
+                        aria-hidden="true"
+                        style="background: var(--amber)"
+                      ></i
+                      ><span id="category-name">待办</span></span
+                    ><span>今天</span>
+                  </div>
+                  <h3>给自己留十分钟阅读</h3>
+                  <p>忙碌的时候，也记得照顾自己的节奏。</p>
+                </div>
+                <p class="category-description" id="category-description" role="status">
+                  待办：记下接下来要做的事。做完后，改成「完成」。
+                </p>
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <span>交互演示 · 分类</span><span class="caption-action">试试从待办改为完成</span>
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="lesson" id="organize" aria-labelledby="organize-title">
+        <div class="lesson-copy">
+          <div class="step-label"><span>03</span> 整理归纳</div>
+          <h2 id="organize-title">让零散的收获，<br />围绕一个主题相遇。</h2>
+          <p>
+            在<strong>「主题归纳」</strong>里创建一个主题，再用「收录已有手记」把相关记录放到一起。连读时，它们就像一篇逐渐长大的文档。
+          </p>
+          <p class="fine-note">
+            收录建立的是关联。同一条手记可以属于多个归纳，也一直保留在「手记」列表里。移出归纳不会删除手记。
+          </p>
+          <div class="instruction">
+            <svg class="icon" aria-hidden="true"><use href="#i-pointer" /></svg
+            >给「学习方法」收录一条新的手记
+          </div>
+        </div>
+        <figure class="demo">
+          <div class="demo-stage">
+            <div class="mini-window">
+              <div class="window-bar">
+                <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span
+                ><span>Memocraft / 主题归纳</span><span>演示</span>
+              </div>
+              <div class="mini-content">
+                <div class="topic-heading">
+                  <div>
+                    <h3 class="mini-title">学习方法</h3>
+                    <p class="mini-sub">留下一些对自己有效的小方法。</p>
+                  </div>
+                  <button type="button" class="small-button ghost-button" id="open-selection">
+                    收录已有手记
+                  </button>
+                </div>
+                <div class="topic-notes" id="topic-notes">
+                  <article class="topic-note">
+                    <svg class="icon" aria-hidden="true"><use href="#i-note" /></svg>
+                    <div>
+                      <h3>试着用自己的话解释</h3>
+                      <p>能说清楚的，才更容易记住。</p>
+                    </div>
+                  </article>
+                  <article class="topic-note">
+                    <svg class="icon" aria-hidden="true"><use href="#i-note" /></svg>
+                    <div>
+                      <h3>给练习留一点时间</h3>
+                      <p>看过之后，试着亲手做一遍。</p>
+                    </div>
+                  </article>
+                </div>
+                <p class="topic-count" id="topic-count" role="status">已收录 2 条示例手记</p>
+                <form class="selection" id="topic-selection" hidden>
+                  <h3>选择要收录的手记</h3>
+                  <label class="selection-choice"
+                    ><input id="topic-checkbox" type="checkbox" checked />把知识讲给别人听</label
+                  >
+                  <div class="selection-actions">
+                    <button type="button" class="text-button" id="cancel-selection">取消</button
+                    ><button type="submit" class="small-button" id="confirm-selection">
+                      收录所选手记
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <span>交互演示 · 主题归纳</span
+            ><span class="caption-action">记录还在，关联多了一处</span>
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="lesson" data-demo="right" id="threads" aria-labelledby="threads-title">
+        <div class="lesson-copy">
+          <div class="step-label"><span>04</span> 记录过程</div>
+          <h2 id="threads-title">一件长期的事，<br />一条自己的时间线。</h2>
+          <p>
+            学一项技能、做一个项目，都可以放进<strong>「长期事务」</strong>。每有一点进展，就「记录动态」，留下当时的行动和想法。
+          </p>
+          <p class="fine-note">
+            「当前概况」写现在的情况，动态记录过去的过程。需要参考某条手记时，可以关联它，不必再抄一份。
+          </p>
+          <div class="instruction">
+            <svg class="icon" aria-hidden="true"><use href="#i-pointer" /></svg
+            >给这个小项目补上一条新进展
+          </div>
+        </div>
+        <figure class="demo">
+          <div class="demo-stage">
+            <div class="mini-window">
+              <div class="window-bar">
+                <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span
+                ><span>Memocraft / 长期事务</span><span>演示</span>
+              </div>
+              <div class="mini-content">
+                <h3 class="mini-title">做一个个人网站</h3>
+                <p class="thread-overview">当前概况：已有第一版，正在慢慢完善。</p>
+                <div class="timeline" id="timeline">
+                  <article class="timeline-item">
+                    <time>10.12 · 示例</time>
+                    <h3>做出第一版页面</h3>
+                  </article>
+                  <article class="timeline-item">
+                    <time>10.10 · 示例</time>
+                    <h3>确定想要分享的内容</h3>
+                  </article>
+                </div>
+                <div class="timeline-action">
+                  <button type="button" class="text-button" id="open-timeline">＋ 记录动态</button>
+                </div>
+                <form class="timeline-form" id="timeline-form" hidden>
+                  <label for="timeline-input">动态描述</label
+                  ><input
+                    id="timeline-input"
+                    value="调整页面留白，读起来更舒服了"
+                    maxlength="80"
+                    required
+                  />
+                  <div class="selection-actions">
+                    <button type="button" class="text-button" id="cancel-timeline">取消</button
+                    ><button type="submit" class="small-button" id="submit-timeline">
+                      记录动态
+                    </button>
+                  </div>
+                </form>
+                <p class="demo-status" id="timeline-status" role="status">
+                  每一小步，都可以留下来。
+                </p>
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <span>交互演示 · 长期事务</span><span class="caption-action">看见进展，也记得来路</span>
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="lesson" id="find" aria-labelledby="find-title">
+        <div class="lesson-copy">
+          <div class="step-label"><span>05</span> 再次找到</div>
+          <h2 id="find-title">不用记住位置，<br />记得一个关键词就好。</h2>
+          <p>
+            点开侧栏的<strong>搜索</strong>，输入你记得的词。手记、归纳、事务和动态都可以找到，再点结果打开内容。
+          </p>
+          <p class="fine-note">
+            快捷键是 ⌘K（macOS）或 Ctrl+K（Windows）。草稿和回收站里的内容不参与搜索。
+          </p>
+          <div class="instruction">
+            <svg class="icon" aria-hidden="true"><use href="#i-pointer" /></svg
+            >试着搜索「记录」或「网站」，再点开结果
+          </div>
+        </div>
+        <figure class="demo">
+          <div class="demo-stage">
+            <div class="mini-window">
+              <div class="window-bar">
+                <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span
+                ><span>Memocraft / 全局搜索</span><span>演示</span>
+              </div>
+              <div class="search-content">
+                <div class="search-box">
+                  <svg class="icon" aria-hidden="true"><use href="#i-search" /></svg
+                  ><input
+                    id="search-input"
+                    aria-label="搜索示例内容"
+                    value="记录"
+                    placeholder="搜索手记、归纳、事务与动态…"
+                    autocomplete="off"
+                  /><kbd>⌘ / Ctrl K</kbd>
+                </div>
+                <p class="search-summary" id="search-summary" role="status">找到 2 条示例内容</p>
+                <div id="search-results">
+                  <button class="search-result" type="button" data-result="0">
+                    <span class="search-kind">手记</span
+                    ><span
+                      ><strong>先写下来，再慢慢整理</strong
+                      ><small>记录不必完整，先留住此刻的想法。</small></span
+                    >
+                  </button>
+                  <button class="search-result" type="button" data-result="1">
+                    <span class="search-kind">归纳</span
+                    ><span
+                      ><strong>记录习惯</strong><small>一些让记录变得轻松的小方法。</small></span
+                    >
+                  </button>
+                </div>
+                <div class="search-detail" id="search-detail" hidden>
+                  <button type="button" class="text-button" id="close-search-detail">
+                    ← 返回结果
+                  </button>
+                  <h3 id="search-detail-title"></h3>
+                  <p id="search-detail-body"></p>
+                </div>
+                <p class="search-help">只搜索这页的示例内容。</p>
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <span>交互演示 · 搜索</span
+            ><span class="caption-action">记录的价值，也在再次打开时</span>
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="lesson" data-demo="right" id="backup" aria-labelledby="backup-title">
+        <div class="lesson-copy">
+          <div class="step-label"><span>06</span> 好好保存</div>
+          <h2 id="backup-title">让积累下来的记录，<br />多一份安心。</h2>
+          <p>
+            进入<strong>设置 → 数据与备份</strong
+            >，把完整备份存到另一个位置。备份包含记录、关联、草稿和图片，可以用于恢复。
+          </p>
+          <p class="fine-note">
+            导出适合用其他工具阅读；备份用于恢复整个知识库，两者用途不同。误删的内容可以先去回收站恢复。
+          </p>
+          <div class="instruction">
+            <svg class="icon" aria-hidden="true"><use href="#i-pointer" /></svg
+            >点点两种方式，看看各自适合做什么
+          </div>
+        </div>
+        <figure class="demo">
+          <div class="demo-stage">
+            <div class="mini-window">
+              <div class="window-bar">
+                <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span
+                ><span>Memocraft / 设置</span><span>演示</span>
+              </div>
+              <div class="mini-content">
+                <h3 class="mini-title">数据与备份</h3>
+                <p class="mini-sub">两种保存方式，两种不同用途。</p>
+                <div class="backup-choices" aria-label="了解保存方式">
+                  <button
+                    class="backup-choice"
+                    type="button"
+                    data-backup="backup"
+                    aria-pressed="true"
+                  >
+                    <svg class="icon" aria-hidden="true"><use href="#i-folder" /></svg
+                    ><strong>完整备份</strong><small>用于恢复知识库</small>
+                  </button>
+                  <button
+                    class="backup-choice"
+                    type="button"
+                    data-backup="export"
+                    aria-pressed="false"
+                  >
+                    <svg class="icon" aria-hidden="true"><use href="#i-export" /></svg
+                    ><strong>Markdown 导出</strong><small>用于阅读与参考</small>
+                  </button>
+                </div>
+                <div class="backup-package">
+                  <p class="package-title">
+                    <svg class="icon" aria-hidden="true"><use href="#i-folder" /></svg
+                    ><span id="package-title">完整备份包含</span>
+                  </p>
+                  <div class="package-list" id="package-list">
+                    <span>全部记录与草稿</span><span>收录与引用关系</span><span>图片附件</span>
+                  </div>
+                </div>
+                <p class="backup-summary" id="backup-summary" role="status">
+                  恢复备份会替换当前知识库；开始前，应用会先备份当前数据。
+                </p>
+              </div>
+            </div>
+          </div>
+          <figcaption>
+            <span>交互演示 · 备份与导出</span
+            ><span class="caption-action">了解用途，不执行真实操作</span>
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="afterword" aria-labelledby="faq-title">
+        <h2 id="faq-title">你可能还想知道</h2>
+        <details class="faq">
+          <summary>
+            AI 功能需要一开始就配置吗？<svg class="icon" aria-hidden="true">
+              <use href="#i-plus" />
+            </svg>
+          </summary>
+          <p>
+            可以按需要再开启。在「设置 → AI 服务」保存 API 地址与密钥后，可以使用首页的 AI
+            建议、搜索问答和按周或月生成的回顾。基础记录与整理无需配置 AI；使用 AI
+            时，会将对应功能所需的内容发送到你保存的 API 地址，并可能产生服务费用。
+          </p>
+        </details>
+        <details class="faq">
+          <summary>
+            记录会保存在网页或服务器上吗？<svg class="icon" aria-hidden="true">
+              <use href="#i-plus" />
+            </svg>
+          </summary>
+          <p>
+            你的应用记录保存在本机。这个网站只提供使用指引，演示内容也只是示例，不会读取或上传你的知识库。当前不提供设备间自动同步，换电脑时可以使用完整备份迁移。
+          </p>
+        </details>
+        <details class="faq">
+          <summary>
+            还没想好如何整理，可以先随便记吗？<svg class="icon" aria-hidden="true">
+              <use href="#i-plus" />
+            </svg>
+          </summary>
+          <p>
+            当然可以。先写正文、保存手记，分类、标题、标签和关联都可以之后调整。不用把每条记录都整理成完整文章，也不用每天打卡。按照自己的节奏，留下对你有用的东西就好。
+          </p>
+        </details>
+      </section>
+      <section class="ending" aria-label="教程结束">
+        <p>现在，回到应用，<br />写下你的第一条手记吧。</p>
+        <small>不必完整，从一句话开始就好。</small>
+      </section>
+    </main>
+    <footer class="container footer-inner">
+      <span>Memocraft · 创忆工坊</span><span>新手指南 · 适用于当前内测版</span
+      ><a href="#top">回到顶部 ↑</a>
+    </footer>
+
+    <script>
+      (() => {
+        // 示例状态不持久化、不访问应用桥接；所有可输入内容以纯文本写入页面。
+        const byId = (id) => document.getElementById(id);
+        const initialNote = byId('note-body').value;
+        byId('write-form').addEventListener('submit', (event) => {
+          event.preventDefault();
+          const text = byId('note-body').value.trim();
+          if (!text) {
+            byId('write-status').textContent = '先写一点内容，再保存这条示例。';
+            byId('note-body').focus();
+            return;
+          }
+          byId('saved-note-text').textContent = text;
+          byId('saved-note').hidden = false;
+          byId('write-status').textContent = '示例已保存：它现在是一条正式手记了。';
+          byId('note-body').value = '';
+          byId('save-note').disabled = true;
+          byId('save-note').textContent = '已演示保存';
+        });
+        byId('write-again').addEventListener('click', () => {
+          byId('saved-note').hidden = true;
+          byId('note-body').value = initialNote;
+          byId('save-note').disabled = false;
+          byId('save-note').textContent = '保存手记';
+          byId('write-status').textContent = '这是一条示例，试试看。';
+          byId('note-body').focus({ preventScroll: true });
+        });
+
+        const categories = {
+          收获: { color: 'var(--blue)', text: '收获：记下新学到的知识、经验或一个有用的方法。' },
+          思绪: { color: 'var(--purple)', text: '思绪：留住当下的感受、念头和还没有答案的思考。' },
+          待办: { color: 'var(--amber)', text: '待办：记下接下来要做的事。做完后，改成「完成」。' },
+          完成: {
+            color: 'var(--green)',
+            text: '完成：这件事已经做完了，记录依然保留在「手记」列表里。',
+          },
+          其他: {
+            color: 'var(--faint)',
+            text: '其他：暂时不适合前面几类的内容，也可以先放在这里。',
+          },
+        };
+        document.querySelectorAll('input[name="category"]').forEach((input) => {
+          input.addEventListener('change', () => {
+            const category = categories[input.value];
+            byId('category-name').textContent = input.value;
+            byId('category-dot').style.background = category.color;
+            byId('category-badge').style.color = category.color;
+            byId('category-description').textContent = category.text;
+          });
+        });
+
+        const closeSelection = () => {
+          byId('topic-selection').hidden = true;
+          byId('open-selection').focus({ preventScroll: true });
+        };
+        byId('open-selection').addEventListener('click', () => {
+          byId('topic-selection').hidden = false;
+          byId('topic-checkbox').focus({ preventScroll: true });
+        });
+        byId('cancel-selection').addEventListener('click', closeSelection);
+        byId('topic-selection').addEventListener('submit', (event) => {
+          event.preventDefault();
+          if (!byId('topic-checkbox').checked) {
+            byId('topic-count').textContent = '先选择一条示例手记。';
+            return;
+          }
+          const item = document.createElement('article');
+          item.className = 'topic-note';
+          // 这里仅插入开发者定义的固定模板，不拼接用户输入。
+          item.innerHTML =
+            '<svg class="icon" aria-hidden="true"><use href="#i-note"/></svg><div><h3>把知识讲给别人听</h3><p>解释的过程，也是在重新整理理解。</p></div>';
+          byId('topic-notes').append(item);
+          byId('topic-selection').hidden = true;
+          byId('open-selection').disabled = true;
+          byId('open-selection').textContent = '示例已收录';
+          byId('topic-count').textContent = '已收录 3 条示例手记，原手记仍保留在「手记」列表里。';
+        });
+
+        byId('open-timeline').addEventListener('click', () => {
+          byId('timeline-form').hidden = false;
+          byId('open-timeline').hidden = true;
+          byId('timeline-input').focus({ preventScroll: true });
+        });
+        const closeTimeline = () => {
+          byId('timeline-form').hidden = true;
+          byId('open-timeline').hidden = false;
+          byId('open-timeline').focus({ preventScroll: true });
+        };
+        byId('cancel-timeline').addEventListener('click', closeTimeline);
+        byId('timeline-form').addEventListener('submit', (event) => {
+          event.preventDefault();
+          const text = byId('timeline-input').value.trim();
+          if (!text) {
+            byId('timeline-status').textContent = '先写下这次进展，再记录动态。';
+            byId('timeline-input').focus();
+            return;
+          }
+          const item = document.createElement('article');
+          item.className = 'timeline-item';
+          const time = document.createElement('time');
+          time.textContent = '今天 · 示例';
+          const heading = document.createElement('h3');
+          heading.textContent = text;
+          item.append(time, heading);
+          byId('timeline').prepend(item);
+          closeTimeline();
+          byId('open-timeline').disabled = true;
+          byId('open-timeline').textContent = '已演示记录动态';
+          byId('timeline-status').textContent = '新的示例进展，已经放在时间线最上方。';
+        });
+
+        const sampleResults = [
+          {
+            kind: '手记',
+            title: '先写下来，再慢慢整理',
+            excerpt: '记录不必完整，先留住此刻的想法。',
+            body: '记录不必完整，先留住此刻的想法。等有了时间，再补上标题、标签，或放进合适的归纳里。',
+          },
+          {
+            kind: '归纳',
+            title: '记录习惯',
+            excerpt: '一些让记录变得轻松的小方法。',
+            body: '围绕记录习惯收录相关手记，慢慢找到适合自己的方式。',
+          },
+          {
+            kind: '事务',
+            title: '做一个个人网站',
+            excerpt: '当前概况：已有第一版，正在慢慢完善。',
+            body: '这是一个长期事务。概况描述当前情况，动态记录网站从想法到第一版的过程。',
+          },
+          {
+            kind: '动态',
+            title: '做出第一版页面',
+            excerpt: '所属事务：做一个个人网站',
+            body: '在「做一个个人网站」中记录的一次进展：完成第一版页面，接下来继续调整留白。',
+          },
+        ];
+        let lastResultButton = null;
+        const openSearchResult = (index, trigger) => {
+          lastResultButton = trigger;
+          const result = sampleResults[index];
+          byId('search-results').hidden = true;
+          byId('search-detail').hidden = false;
+          byId('search-detail-title').textContent = result.title;
+          byId('search-detail-body').textContent = result.body;
+          byId('close-search-detail').focus({ preventScroll: true });
+        };
+        byId('search-results').addEventListener('click', (event) => {
+          const button = event.target.closest('[data-result]');
+          if (button) openSearchResult(Number(button.dataset.result), button);
+        });
+        byId('close-search-detail').addEventListener('click', () => {
+          byId('search-results').hidden = false;
+          byId('search-detail').hidden = true;
+          if (lastResultButton?.isConnected) lastResultButton.focus({ preventScroll: true });
+        });
+        byId('search-input').addEventListener('input', () => {
+          const query = byId('search-input').value.trim().toLowerCase();
+          byId('search-detail').hidden = true;
+          byId('search-results').hidden = false;
+          byId('search-results').replaceChildren();
+          let count = 0;
+          sampleResults.forEach((result, index) => {
+            if (
+              query &&
+              !`${result.title} ${result.excerpt} ${result.body}`.toLowerCase().includes(query)
+            )
+              return;
+            count += 1;
+            const button = document.createElement('button');
+            button.className = 'search-result';
+            button.type = 'button';
+            button.dataset.result = String(index);
+            const kind = document.createElement('span');
+            kind.className = 'search-kind';
+            kind.textContent = result.kind;
+            const copy = document.createElement('span');
+            const title = document.createElement('strong');
+            title.textContent = result.title;
+            const excerpt = document.createElement('small');
+            excerpt.textContent = result.excerpt;
+            copy.append(title, excerpt);
+            button.append(kind, copy);
+            byId('search-results').append(button);
+          });
+          byId('search-summary').textContent = count
+            ? query
+              ? `找到 ${count} 条示例内容`
+              : '这里是全部 4 条示例内容'
+            : '没有找到匹配的示例，试试「记录」或「网站」。';
+        });
+
+        const backupModes = {
+          backup: {
+            title: '完整备份包含',
+            items: ['全部记录与草稿', '收录与引用关系', '图片附件'],
+            summary: '恢复备份会替换当前知识库；开始前，应用会先备份当前数据。',
+          },
+          export: {
+            title: 'Markdown 导出包含',
+            items: ['可阅读的 Markdown', '关系元数据'],
+            summary: '导出不包含草稿和图片文件，适合阅读与迁移参考，不能代替完整备份。',
+          },
+        };
+        document.querySelectorAll('[data-backup]').forEach((button) => {
+          button.addEventListener('click', () => {
+            const mode = backupModes[button.dataset.backup];
+            document
+              .querySelectorAll('[data-backup]')
+              .forEach((peer) => peer.setAttribute('aria-pressed', String(peer === button)));
+            byId('package-title').textContent = mode.title;
+            byId('package-list').replaceChildren(
+              ...mode.items.map((text) => {
+                const item = document.createElement('span');
+                item.textContent = text;
+                return item;
+              }),
+            );
+            byId('backup-summary').textContent = mode.summary;
+          });
+        });
+
+        if (
+          'IntersectionObserver' in window &&
+          !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ) {
+          const observer = new IntersectionObserver(
+            (entries) => {
+              entries.forEach((entry) => {
+                if (!entry.isIntersecting) return;
+                entry.target.classList.add('is-visible');
+                observer.unobserve(entry.target);
+              });
+            },
+            { threshold: 0.08 },
+          );
+          document.querySelectorAll('.lesson').forEach((lesson) => {
+            lesson.classList.add('will-reveal');
+            observer.observe(lesson);
+          });
+        }
+      })();
+    </script>
+  </body>
+</html>

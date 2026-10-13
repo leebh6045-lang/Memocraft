@@ -430,7 +430,7 @@ function persistedSummaries(dataDirectory: string) {
   }
 }
 
-test('真实桌面：凝结入场与周月切换、彩色星芒、滑块和高度补间、快速连点', async () => {
+test('真实桌面：凝结入场与周月切换、淡蓝星芒、滑块和高度补间、快速连点', async () => {
   test.setTimeout(150_000);
   const root = await mkdtemp(join(tmpdir(), 'memocraft-review-motion-'));
   const dataDirectory = join(root, 'data');
@@ -458,21 +458,35 @@ test('真实桌面：凝结入场与周月切换、彩色星芒、滑块和高�
       const button = element.closest('button');
       const label = button?.querySelector('.label');
       if (!button || !label) throw new Error('回顾星芒缺少所属控件');
-      const gradient = element.querySelector('linearGradient');
+      const path = element.querySelector('path');
+      if (!path) throw new Error('回顾星芒缺少描边路径');
       return {
         rightInset: button.getBoundingClientRect().right - element.getBoundingClientRect().right,
         gapAfterLabel: element.getBoundingClientRect().left - label.getBoundingClientRect().right,
-        colors: Array.from(element.querySelectorAll('stop')).map((stop) =>
-          stop.getAttribute('stop-color'),
-        ),
-        gradientMatches:
-          element.querySelector('path')?.getAttribute('stroke') === `url(#${gradient?.id})`,
+        gradientCount: element.querySelectorAll('linearGradient').length,
+        stroke: getComputedStyle(path).stroke,
       };
     });
     expect(markerPlacement.rightInset).toBeCloseTo(12, 0);
     expect(markerPlacement.gapAfterLabel).toBeGreaterThan(20);
-    expect(new Set(markerPlacement.colors).size).toBeGreaterThanOrEqual(3);
-    expect(markerPlacement.gradientMatches).toBe(true);
+    expect(markerPlacement.gradientCount).toBe(0);
+    expect(markerPlacement.stroke).toBe('rgb(143, 176, 214)');
+    // 主题切换后仍使用同一淡蓝；截图核对实际导航图标的对齐和可见性。
+    await page.locator('.review-nav-item').screenshot({
+      path: join(artifacts, 'review-ai-light.png'),
+      animations: 'disabled',
+    });
+    await page.locator('.nav-tools').getByRole('button', { name: '深色', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await expect(page.locator('html')).not.toHaveClass(/theme-switching/);
+    await expect(marker.locator('path')).toHaveCSS('stroke', 'rgb(143, 176, 214)');
+    await page.locator('.review-nav-item').screenshot({
+      path: join(artifacts, 'review-ai-dark.png'),
+      animations: 'disabled',
+    });
+    await page.locator('.nav-tools').getByRole('button', { name: '浅色', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await expect(page.locator('html')).not.toHaveClass(/theme-switching/);
     await page.screenshot({ path: join(artifacts, 'review-week-before.png'), animations: 'allow' });
 
     const toMonth = await observeMotion(page, ['按月']);
@@ -498,7 +512,7 @@ test('真实桌面：凝结入场与周月切换、彩色星芒、滑块和高�
     const toEmpty = await observeMotion(page, [{ periodIndex: 1 }]);
     expectInterpolated(toEmpty, 'height');
     expectExclusiveContent(toEmpty);
-    await expect(page.getByText('这段时间没有新手记。', { exact: true })).toBeVisible();
+    await expect(page.getByText('这段时间还没有手记，换一段看看。', { exact: true })).toBeVisible();
     expect(finalFrame(toEmpty).summary).toBe('');
     expectNaturalHeight(finalFrame(toEmpty));
     expect(await networkState(app)).toHaveLength(0);
@@ -652,7 +666,7 @@ test('真实桌面：周期动效不阻塞取消，减少动态效果立即切�
     expect(await networkState(app)).toHaveLength(0);
     const reducedEmpty = await observeMotion(page, [{ periodIndex: 1 }], 300);
     for (const frame of reducedEmpty.slice(1)) expectNaturalHeight(frame);
-    await expect(page.getByText('这段时间没有新手记。', { exact: true })).toBeVisible();
+    await expect(page.getByText('这段时间还没有手记，换一段看看。', { exact: true })).toBeVisible();
     expect(finalFrame(reducedEmpty).summary).toBe('');
     expect(await networkState(app)).toHaveLength(0);
     expect(errors).toEqual([]);

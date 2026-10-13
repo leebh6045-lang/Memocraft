@@ -33,7 +33,7 @@ function groupAt(groups: TimelineGroup[], index: number): TimelineGroup {
   return group;
 }
 
-describe('随手记按时间分段', () => {
+describe('手记按时间分段', () => {
   const todayLate = note('today-2', at(9, 27, 15, 5));
   const todayEarly = note('today-1', at(9, 27, 9, 30));
   const yesterday = note('yesterday', at(9, 26, 23, 16));

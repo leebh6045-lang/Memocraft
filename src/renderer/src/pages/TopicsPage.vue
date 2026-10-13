@@ -287,7 +287,7 @@ async function confirmPick(noteIds: string[]): Promise<void> {
 async function removeFromTopic(topicId: string, noteId: string): Promise<void> {
   if (await props.state.removeNote(topicId, noteId)) {
     emit('notify', {
-      message: '已从归纳移出，手记仍在随手记',
+      message: '已从归纳移出，手记仍保留在「手记」列表中',
       undo: () => {
         void props.state.addNotes(topicId, [noteId]);
       },
@@ -303,7 +303,7 @@ async function removeTopic(topicId: string): Promise<void> {
 
 /** 归纳内的新建手记：先回到首页写一条，保存后再收录由用户决定。 */
 function writeInTopic(): void {
-  emit('notify', { message: '手记先保存到随手记，再回到归纳收录。' });
+  emit('notify', { message: '请先保存手记，再回到归纳收录。' });
 }
 </script>
 
@@ -312,7 +312,7 @@ function writeInTopic(): void {
     <template v-if="view === 'list'">
       <header class="page-head">
         <div>
-          <h1>知识归纳</h1>
+          <h1>主题归纳</h1>
           <p class="sub">围绕一个主题收录手记，同一条手记可以出现在多个归纳里。</p>
         </div>
         <div class="actions">
@@ -339,7 +339,7 @@ function writeInTopic(): void {
       </div>
       <div v-else-if="topicsLoading && !topics.length" class="empty">正在读取归纳…</div>
       <div v-else-if="!topics.length" class="empty">
-        还没有归纳。<br />
+        建个归纳，把相关手记放在一起。<br />
         <button class="btn-ghost" @click="openCreate">新建第一个归纳</button>
       </div>
       <!-- 目录：没有卡片框，序号、标题、点线与条数，下面直接露出最新几条手记。 -->
@@ -415,7 +415,7 @@ function writeInTopic(): void {
     </template>
 
     <template v-else-if="activeTopic">
-      <button class="crumb" @click="backToList"><span aria-hidden="true">‹</span> 知识归纳</button>
+      <button class="crumb" @click="backToList"><span aria-hidden="true">‹</span> 主题归纳</button>
       <div class="detail-head">
         <div class="head-main">
           <h1 class="detail-title">
@@ -625,7 +625,7 @@ function writeInTopic(): void {
   color: var(--danger);
 }
 
-/* 目录：只有序号、标题、引导点线和细分隔线，与随手记的卡片网格一眼分开。 */
+/* 目录：只有序号、标题、引导点线和细分隔线，与手记的卡片网格一眼分开。 */
 .toc {
   margin: 0;
   padding: 0;

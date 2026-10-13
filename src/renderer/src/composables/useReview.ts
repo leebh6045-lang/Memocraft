@@ -166,7 +166,7 @@ export function useReview(
         return;
       }
       if (!settings.value.keyConfigured) {
-        showError('AI_NOT_CONFIGURED', '请先在设置页配置 DeepSeek API Key，才能生成回顾。');
+        showError('AI_NOT_CONFIGURED', '先去设置里接入 AI。');
         return;
       }
       if (hasPeriodNotes(start, end)) phase.value = 'loading';

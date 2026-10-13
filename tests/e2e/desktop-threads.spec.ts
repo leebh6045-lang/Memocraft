@@ -45,7 +45,7 @@ test('真实桌面：长期事务、动态时间线与引用反查', async () =>
     const createDialog = page.getByRole('dialog', { name: '新建事务' });
     await expect(createDialog).toBeVisible();
     await createDialog
-      .getByRole('textbox', { name: '标题', exact: true })
+      .getByRole('textbox', { name: '标题（必填）', exact: true })
       .fill('个人服务器搭建与维护');
     await createDialog.getByRole('button', { name: '创建', exact: true }).click();
     // 详情页标题只读呈现（状态跟在标题后），编辑入口收进右侧抽屉。
@@ -73,10 +73,10 @@ test('真实桌面：长期事务、动态时间线与引用反查', async () =>
       .getByRole('textbox', { name: '详细内容（可选，Markdown）' })
       .fill('原因是只配了 cert.pem。');
     await page.getByRole('button', { name: '＋ 引用手记' }).click();
-    const picker = page.getByRole('dialog', { name: '收录手记' });
+    const picker = page.getByRole('dialog', { name: '引用手记' });
     await expect(picker).toBeVisible();
     await picker.getByRole('checkbox').first().check();
-    await picker.getByRole('button', { name: '收录', exact: true }).click();
+    await picker.getByRole('button', { name: '引用', exact: true }).click();
     await expect(picker).toHaveCount(0);
     await entryDrawer.getByRole('button', { name: '记录动态' }).click();
     await expect(page.locator('.timeline .entry')).toHaveCount(1);
@@ -103,17 +103,18 @@ test('真实桌面：长期事务、动态时间线与引用反查', async () =>
 
     // 事务级直接关联同一条手记：应与动态级引用并存而不重复。
     await page.getByRole('button', { name: '＋ 关联手记' }).click();
-    const threadPicker = page.getByRole('dialog', { name: '收录手记' });
+    const threadPicker = page.getByRole('dialog', { name: '关联手记' });
     await threadPicker.getByRole('checkbox').first().check();
-    await threadPicker.getByRole('button', { name: '收录', exact: true }).click();
+    await threadPicker.getByRole('button', { name: '关联', exact: true }).click();
     await expect(page.locator('.thread-note .card')).toHaveCount(1);
 
     // 手记侧反查：动态级与事务级各一条，点动态级引用跳回并定位。
     await page
-      .getByRole('button', { name: /随手记/ })
+      .getByRole('navigation', { name: '主导航' })
+      .getByRole('button', { name: /^手记/ })
       .first()
       .click();
-    await expect(page.getByRole('heading', { name: '随手记', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '手记', exact: true })).toBeVisible();
     await expect(page.locator('.page-enter-active')).toHaveCount(0);
     await page.locator('.card').first().click();
     const drawer = page.getByRole('dialog', { name: '手记详情' });

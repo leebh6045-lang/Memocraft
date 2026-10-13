@@ -66,7 +66,7 @@ watch(
             ×
           </button></span
         >
-        <span v-if="!modelValue.length" class="faint small">还没有选标签，下面点一下即可。</span>
+        <span v-if="!modelValue.length" class="faint small">选几个标签，也可以先跳过。</span>
       </div>
     </div>
 
@@ -104,7 +104,7 @@ watch(
     /></label>
 
     <template #footer>
-      <span>已选 {{ modelValue.length }} 个 · 预设与自定义标签等价</span>
+      <span>已选 {{ modelValue.length }} 个 · 也可以自己加标签</span>
       <button class="btn-primary" :disabled="props.busy" @click="close">完成</button>
     </template>
   </SideDrawer>

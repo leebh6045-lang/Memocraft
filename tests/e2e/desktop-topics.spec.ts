@@ -47,7 +47,9 @@ test('真实桌面：新建归纳、多重收录、抽屉反查与移出', async
       .click();
     const createDialog = page.getByRole('dialog', { name: '新建归纳' });
     await expect(createDialog).toBeVisible();
-    await createDialog.getByRole('textbox', { name: '标题', exact: true }).fill('本地数据库');
+    await createDialog
+      .getByRole('textbox', { name: '标题（必填）', exact: true })
+      .fill('本地数据库');
     await createDialog
       .getByRole('textbox', { name: '说明（可选）', exact: true })
       .fill('事务、备份与查询');
@@ -78,7 +80,7 @@ test('真实桌面：新建归纳、多重收录、抽屉反查与移出', async
 
     // 第二个归纳：从列表页新建。
     await page
-      .getByRole('button', { name: /知识归纳/ })
+      .getByRole('button', { name: /主题归纳/ })
       .first()
       .click();
     await page
@@ -87,7 +89,7 @@ test('真实桌面：新建归纳、多重收录、抽屉反查与移出', async
       .click();
     await page
       .getByRole('dialog', { name: '新建归纳' })
-      .getByRole('textbox', { name: '标题' })
+      .getByRole('textbox', { name: '标题（必填）', exact: true })
       .fill('服务器运维');
     await page
       .getByRole('dialog', { name: '新建归纳' })
@@ -128,7 +130,7 @@ test('真实桌面：新建归纳、多重收录、抽屉反查与移出', async
 
     // 第二个归纳也收录同一条手记。
     await page
-      .getByRole('button', { name: /知识归纳/ })
+      .getByRole('button', { name: /主题归纳/ })
       .first()
       .click();
     // 集合卡片的可读名称带序号，按文本定位更稳。
@@ -142,10 +144,11 @@ test('真实桌面：新建归纳、多重收录、抽屉反查与移出', async
     // 选择器这时必须列归纳（而不是手记），并且把已经收录的归纳标出来。
     const openNoteDrawer = async (noteTitleText: string) => {
       await page
-        .getByRole('button', { name: /随手记/ })
+        .getByRole('navigation', { name: '主导航' })
+        .getByRole('button', { name: /^手记/ })
         .first()
         .click();
-      await expect(page.getByRole('heading', { name: '随手记', exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { name: '手记', exact: true })).toBeVisible();
       await expect(page.locator('.page-enter-active')).toHaveCount(0);
       await page.locator('.card').filter({ hasText: noteTitleText }).click();
       const panel = page.getByRole('dialog', { name: '手记详情' });
@@ -190,7 +193,9 @@ test('真实桌面：新建归纳、多重收录、抽屉反查与移出', async
       .click();
     const newTopicDialog = page.getByRole('dialog', { name: '新建归纳' });
     await expect(newTopicDialog).toBeVisible();
-    await newTopicDialog.getByRole('textbox', { name: '标题', exact: true }).fill('归档与检索');
+    await newTopicDialog
+      .getByRole('textbox', { name: '标题（必填）', exact: true })
+      .fill('归档与检索');
     await newTopicDialog.getByRole('button', { name: '创建', exact: true }).click();
     await expect(newTopicDialog).toHaveCount(0);
     await expect(page.getByRole('dialog', { name: '收录到归纳' })).toBeVisible();
@@ -235,7 +240,7 @@ test('真实桌面：新建归纳、多重收录、抽屉反查与移出', async
       .fill('归纳验收样例一：事务回滚（已核对）');
     await expect(drawer.getByText('已保存', { exact: true })).toBeVisible();
 
-    // 从抽屉移出一个归纳：手记仍在随手记，另一个归纳的收录不受影响。
+    // 从抽屉移出一个归纳：手记仍在「手记」列表，另一个归纳的收录不受影响。
     await collectSection.getByRole('button', { name: '从「本地数据库」移出', exact: true }).click();
     await expect(
       collectSection.getByRole('button', { name: '本地数据库', exact: true }),
@@ -257,7 +262,8 @@ test('真实桌面：新建归纳、多重收录、抽屉反查与移出', async
     await drawer.getByRole('button', { name: /^关闭/ }).click();
     await expect(drawer).toHaveCount(0);
     await page
-      .getByRole('button', { name: /随手记/ })
+      .getByRole('navigation', { name: '主导航' })
+      .getByRole('button', { name: /^手记/ })
       .first()
       .click();
     await expect(page.locator('.card')).toHaveCount(2);
@@ -269,7 +275,7 @@ test('真实桌面：新建归纳、多重收录、抽屉反查与移出', async
     const reopened = await app.firstWindow();
     reopened.on('pageerror', (error) => errors.push(error.message));
     await reopened
-      .getByRole('button', { name: /知识归纳/ })
+      .getByRole('button', { name: /主题归纳/ })
       .first()
       .click();
     await expect(reopened.locator('.card.collection')).toHaveCount(3);

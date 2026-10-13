@@ -228,12 +228,14 @@ function tabKeydown(event: KeyboardEvent): void {
               </div>
             </div>
 
-            <p v-if="phase === 'empty'" class="review-empty review-reveal">这段时间没有新手记。</p>
+            <p v-if="phase === 'empty'" class="review-empty review-reveal">
+              这段时间还没有手记，换一段看看。
+            </p>
             <div
               v-else-if="phase === 'error' && errorCode === 'AI_NOT_CONFIGURED'"
               class="review-notice review-reveal"
             >
-              <p>请先在设置页配置 DeepSeek API Key，才能生成回顾。</p>
+              <p>先去设置里接入 AI。</p>
               <button
                 type="button"
                 class="btn"
@@ -307,7 +309,7 @@ function tabKeydown(event: KeyboardEvent): void {
               </template>
               <footer class="review-meta summary-meta review-reveal">
                 <div>
-                  <span>覆盖 {{ summary.noteCount }} 条手记</span>
+                  <span>生成时有 {{ summary.noteCount }} 条手记</span>
                   <span aria-hidden="true"> · </span>
                   <span class="summary-generated">
                     上次生成于

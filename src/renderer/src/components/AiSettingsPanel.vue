@@ -30,6 +30,10 @@ let configurationVersion = 0;
 const locked = computed(
   () => !!props.busy || loading.value || !!operation.value || activeTest.value !== null,
 );
+// 标题仅反映本机密钥配置；连接成功仍须由实际测试确认。
+const panelTitle = computed(() =>
+  settings.value?.keyConfigured === false ? '为 Memocraft 接入 AI' : 'AI 服务',
+);
 const selectedModel = computed(() => settings.value?.model ?? DEFAULT_AI_MODEL);
 const hasKeyDraft = computed(() => keyDraft.value.length > 0);
 const hasAddressDraft = computed(
@@ -299,7 +303,7 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="panel" :class="{ embedded }" aria-labelledby="ai-settings-title">
-    <h2 id="ai-settings-title">AI 设置</h2>
+    <h2 id="ai-settings-title">{{ panelTitle }}</h2>
     <p class="panel-sub">配置保存在本机，密钥单独加密保存，不随知识库备份或导出。</p>
 
     <div class="panel-row">

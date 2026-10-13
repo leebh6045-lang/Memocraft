@@ -50,7 +50,9 @@ async function openSettings(page: Page): Promise<void> {
   await expect(page.getByRole('button', { name: /设置/ })).toBeVisible();
   await page.getByRole('button', { name: /设置/ }).click();
   await page.getByRole('tab', { name: 'AI 服务', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'AI 设置', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: /^(?:AI 服务|为 Memocraft 接入 AI)$/ }),
+  ).toBeVisible();
 }
 
 test('真实桌面：AI 加密配置、两个模型、取消、备份恢复与重启', async () => {
@@ -101,7 +103,7 @@ test('真实桌面：AI 加密配置、两个模型、取消、备份恢复与�
     expect(protectedStorage, '桌面验收需要真实可用的系统密钥保护').toBe(true);
     await mockCompletion(app, DEFAULT_AI_MODEL);
     await openSettings(page);
-    const panel = page.getByRole('region', { name: 'AI 设置', exact: true });
+    const panel = page.getByRole('region', { name: /^(?:AI 服务|为 Memocraft 接入 AI)$/ });
     const model = panel.getByRole('combobox', { name: /模型/ });
     const key = panel.locator('#ai-key');
     const configured = panel.locator('label[for="ai-key"] .pr-hint');
@@ -198,7 +200,7 @@ test('真实桌面：AI 加密配置、两个模型、取消、备份恢复与�
     }, packPath);
     await page.getByRole('tab', { name: '数据与备份', exact: true }).click();
     await page.getByRole('button', { name: '选择位置并备份', exact: true }).click();
-    await expect(page.locator('.toast').filter({ hasText: '已备份' })).toBeVisible();
+    await expect(page.locator('.toast').filter({ hasText: '备份已完成' })).toBeVisible();
     expect(existsSync(join(packPath, 'credentials'))).toBe(false);
     expect(readFileSync(join(packPath, 'memocraft.sqlite')).includes(Buffer.from(testKey))).toBe(
       false,
@@ -226,7 +228,9 @@ test('真实桌面：AI 加密配置、两个模型、取消、备份恢复与�
     app = await launch();
     const reopened = await attachPage(app);
     await openSettings(reopened);
-    const reopenedPanel = reopened.getByRole('region', { name: 'AI 设置', exact: true });
+    const reopenedPanel = reopened.getByRole('region', {
+      name: /^(?:AI 服务|为 Memocraft 接入 AI)$/,
+    });
     await expect(reopenedPanel.getByRole('combobox', { name: /模型/ })).toHaveValue(
       'deepseek-v4-pro',
     );
@@ -248,7 +252,9 @@ test('真实桌面：AI 加密配置、两个模型、取消、备份恢复与�
     app = await launch();
     const cleared = await attachPage(app);
     await openSettings(cleared);
-    const clearedPanel = cleared.getByRole('region', { name: 'AI 设置', exact: true });
+    const clearedPanel = cleared.getByRole('region', {
+      name: /^(?:AI 服务|为 Memocraft 接入 AI)$/,
+    });
     await expect(clearedPanel.locator('label[for="ai-key"] .pr-hint')).toHaveText('未配置');
     await expect(clearedPanel.getByRole('combobox', { name: /模型/ })).toHaveValue(
       'deepseek-v4-pro',

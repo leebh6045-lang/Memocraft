@@ -92,7 +92,9 @@ function capturedRequests(app: ElectronApplication): Promise<EndpointRequest[]> 
 async function openSettings(page: Page): Promise<void> {
   await page.getByRole('button', { name: /设置/ }).click();
   await page.getByRole('tab', { name: 'AI 服务', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'AI 设置', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: /^(?:AI 服务|为 Memocraft 接入 AI)$/ }),
+  ).toBeVisible();
 }
 
 async function goHome(page: Page): Promise<void> {
@@ -164,7 +166,7 @@ test('真实桌面：自定义 AI 地址覆盖全部业务、输入保留、官�
     expect(encryptedKey.includes(Buffer.from(testKey))).toBe(false);
 
     await openSettings(page);
-    const panel = page.getByRole('region', { name: 'AI 设置', exact: true });
+    const panel = page.getByRole('region', { name: /^(?:AI 服务|为 Memocraft 接入 AI)$/ });
     const baseUrl = panel.locator('#ai-base-url');
     const saveAddress = panel.getByRole('button', { name: '保存地址', exact: true });
     const testConnection = panel.getByRole('button', { name: '测试连接', exact: true });
@@ -252,7 +254,7 @@ test('真实桌面：自定义 AI 地址覆盖全部业务、输入保留、官�
     }, packPath);
     await page.getByRole('tab', { name: '数据与备份', exact: true }).click();
     await page.getByRole('button', { name: '选择位置并备份', exact: true }).click();
-    await expect(page.locator('.toast').filter({ hasText: '已备份' })).toBeVisible();
+    await expect(page.locator('.toast').filter({ hasText: '备份已完成' })).toBeVisible();
     expect(existsSync(join(packPath, 'credentials'))).toBe(false);
     expect(readFileSync(join(packPath, 'memocraft.sqlite')).includes(Buffer.from(testKey))).toBe(
       false,
@@ -294,7 +296,9 @@ test('真实桌面：自定义 AI 地址覆盖全部业务、输入保留、官�
     const reopened = await attach(app);
     await mockEndpoints(app);
     await openSettings(reopened);
-    const reopenedPanel = reopened.getByRole('region', { name: 'AI 设置', exact: true });
+    const reopenedPanel = reopened.getByRole('region', {
+      name: /^(?:AI 服务|为 Memocraft 接入 AI)$/,
+    });
     await expect(reopenedPanel.locator('#ai-base-url')).toHaveValue(customBaseUrl);
     await expect(reopenedPanel.locator('label[for="ai-key"] .pr-hint')).toHaveText('已配置');
     await reopenedPanel.getByRole('button', { name: '测试连接', exact: true }).click();

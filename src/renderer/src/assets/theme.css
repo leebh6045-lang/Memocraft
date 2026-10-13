@@ -18,6 +18,7 @@
   --bar-h: 34px;
   --c-todo: #b8862b;
   --c-done: #4f8a63;
+  --c-thought: #8a6c9c;
   --danger: #b3473f;
 }
 
@@ -36,6 +37,11 @@
   --accent: #3b5b7c;
   --accent-soft: #e6edf5;
   --on-accent: #ffffff;
+  /* 回顾云团分成深浅两层，以透明度交叉过渡，避免主题切换时渐变突变。 */
+  --review-cloud-light: 0.72;
+  --review-cloud-light-emphasis: 1;
+  --review-cloud-dark: 0;
+  --review-cloud-dark-emphasis: 0;
   --shadow: 0 1px 2px rgba(20, 18, 30, 0.04), 0 6px 20px rgba(20, 18, 30, 0.05);
   --shadow-lg: 0 20px 60px rgba(20, 18, 30, 0.18);
   --glass: rgba(255, 255, 255, 0.78);
@@ -56,12 +62,17 @@
   --accent: #8fb0d6;
   --accent-soft: #25313f;
   --on-accent: #111318;
+  --review-cloud-light: 0;
+  --review-cloud-light-emphasis: 0;
+  --review-cloud-dark: 0.72;
+  --review-cloud-dark-emphasis: 1;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
   --shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.6);
   --glass: rgba(31, 32, 37, 0.8);
   --backdrop: rgba(0, 0, 0, 0.5);
   --c-todo: #d8a94f;
   --c-done: #7cb98f;
+  --c-thought: #bfa0d0;
   --danger: #ed938c;
 }
 
@@ -787,7 +798,7 @@ textarea::placeholder {
     0 0 0 1px var(--border);
 }
 
-/* 集合卡片（知识归纳等）：序号 + 标题 + 说明 + 数量与时间。 */
+/* 集合卡片（主题归纳等）：序号 + 标题 + 说明 + 数量与时间。 */
 .card.collection {
   gap: 10px;
   min-height: 130px;
@@ -1079,6 +1090,9 @@ mark {
 }
 .cat-insight {
   --cat-color: var(--accent);
+}
+.cat-thought {
+  --cat-color: var(--c-thought);
 }
 .cat-todo {
   --cat-color: var(--c-todo);
@@ -1647,7 +1661,7 @@ mark {
 /* 等宽分类使选中底块无需测量 DOM；原生 radio 保留方向键与单选语义。 */
 .category-selector {
   display: inline-grid;
-  grid-template-columns: repeat(4, 50px);
+  grid-template-columns: repeat(var(--category-count), 50px);
   gap: 2px;
   flex-shrink: 0;
 }
@@ -1915,7 +1929,7 @@ html.theme-switching * {
     text-decoration-color var(--dur-3) ease;
 }
 
-/* 左下角：发行标识与辅助入口（设置、阶段 4 起的回收站）并列，不占用侧栏工具区。 */
+/* 左下角：发行标识与回收站、帮助、设置并列，不占用侧栏工具区。 */
 .corner {
   position: fixed;
   left: 16px;

@@ -25,7 +25,7 @@ export function formatTime(iso: string, now: Date = new Date()): string {
 }
 
 /**
- * 只写时刻「HH:MM」：仅用于随手记「按时间」呈现里按天分出的段——
+ * 只写时刻「HH:MM」：仅用于手记「按时间」呈现里按天分出的段——
  * 日期已经写在日期栏上，卡片不再重复「今天」「09.25」。其余地方一律用 formatTime。
  */
 export function formatClock(iso: string): string {

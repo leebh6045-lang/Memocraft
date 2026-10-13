@@ -82,21 +82,24 @@ function isPeriodNotes(value: unknown): value is PeriodNotesResult {
   );
 }
 
-/** 每类独立上限，不把缺失分类的份额补给其他分类；同时间以 ID 稳定排序。 */
+/** 超量时按分类轮流取最新记录，避免较旧的一类被全局上限挤掉；各类仍有独立上限。 */
 export function samplePeriodNotes(notes: readonly PeriodNote[]): PeriodNote[] {
   const sorted = [...notes].sort(
     (a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id),
   );
   if (sorted.length <= AI_PERIOD_CONTEXT_LIMIT) return sorted;
-  const counts = new Map<string, number>();
-  return sorted
-    .filter((note) => {
-      const count = counts.get(note.category) ?? 0;
-      if (count >= AI_PERIOD_CATEGORY_LIMIT) return false;
-      counts.set(note.category, count + 1);
-      return true;
-    })
-    .slice(0, AI_PERIOD_CONTEXT_LIMIT);
+  const groups = NOTE_CATEGORIES.map((category) =>
+    sorted.filter((note) => note.category === category.value).slice(0, AI_PERIOD_CATEGORY_LIMIT),
+  );
+  const selected = new Set<PeriodNote>();
+  for (let index = 0; index < AI_PERIOD_CATEGORY_LIMIT; index += 1) {
+    for (const group of groups) {
+      const note = group[index];
+      if (note && selected.size < AI_PERIOD_CONTEXT_LIMIT) selected.add(note);
+    }
+  }
+  // 取样后恢复原有倒序，图片及逐点链接继续使用同一份稳定编号。
+  return sorted.filter((note) => selected.has(note));
 }
 
 function responseFailure(): never {
@@ -358,8 +361,9 @@ export class AiPeriodSummaryService {
         {
           role: 'system',
           content: [
-            '你是用户的个人知识库助手，帮助用户回顾一段时间的学习积累。',
+            '你是用户的个人知识库助手，帮助用户回顾一段时间的学习积累、日常感受与个人思考。',
             '只依据给出的手记、图片与统计回答，不使用外部知识，不推测没有记录的内容。图片不可辨认时不要猜测。',
+            '思绪类记录可以是情绪、情感、当下念头或思想片段，依据内容回顾，不强行提炼为学习成果，不推断未记录的心理状态。',
             '回顾概要 summary 是主体内容，必须按主题分点、有层次、有侧重，不能写成一大段流水账，也不能按手记逐条等权罗列。一般写 2–4 个要点，内容少时可以只有 1 点，不机械凑数。',
             'summary 中每个要点独立一行，使用 Markdown 无序列表，格式为「- **主题短标题**：具体回顾」。要点之间用换行分隔；标题要具体，让用户一眼看出重点，不加开场套话或结尾总结。',
             '先辨认本期的核心积累：优先关注可见内容中详尽的原理、深入分析和反复实践所得的收获，区分有分量的积累与只记一个命令或简短备忘的记录。',

@@ -18,8 +18,8 @@ const props = defineProps<{
 const resultVisible = computed(() => props.phase === 'ready' || props.phase === 'empty');
 const privacy = computed(() =>
   resultVisible.value && (props.suggestion?.usedImages ?? 0) > 0
-    ? '由 DeepSeek 生成；正文前 800 字、标题、归纳候选、标签和本次纳入图片会发送给 DeepSeek。'
-    : '由 DeepSeek 生成；正文前 800 字、标题、归纳候选和标签会发送给 DeepSeek。',
+    ? '由 AI 生成；正文前 800 字、标题、归纳候选、标签和本次纳入图片会发送到已保存的 AI 服务地址。'
+    : '由 AI 生成；正文前 800 字、标题、归纳候选和标签会发送到已保存的 AI 服务地址。',
 );
 
 defineEmits<{
@@ -72,7 +72,7 @@ defineEmits<{
           <span v-else class="hint">没有合适的标签建议</span>
         </div>
         <div class="suggest-line">
-          <span class="label">可归入</span>
+          <span class="label">相关归纳</span>
           <div v-if="suggestion.topics.length" class="chip-row topic-row">
             <button
               v-for="topic in suggestion.topics"
@@ -99,7 +99,7 @@ defineEmits<{
         <template v-else>有 {{ suggestion.skippedImages }} 张图片未参与建议。</template>
       </p>
       <p v-if="isStale && (phase === 'ready' || phase === 'empty')" class="hint stale">
-        正文或图片已修改，建议可能不再匹配。
+        内容改了，建议可能不再适用。
         <button type="button" class="btn-ghost" :disabled="busy" @click="$emit('retry')">
           重新生成
         </button>
@@ -146,7 +146,9 @@ defineEmits<{
   margin-bottom: 10px;
 }
 .label {
-  flex: 0 0 44px;
+  /* 四字的归纳标签保持一行，两行建议共用同一列对齐。 */
+  flex: 0 0 52px;
+  white-space: nowrap;
   padding-top: 4px;
   color: var(--muted);
   font-size: 12px;

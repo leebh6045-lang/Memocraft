@@ -152,7 +152,7 @@ describe('设置页分类与编辑现场', () => {
     const settings = await mountSettings(fixture(), 'ai');
     expect(selectedTab(settings).text()).toBe('AI 服务');
     expect(settings.get('#settings-panel-ai').isVisible()).toBe(true);
-    expect(settings.get('#ai-settings-title').text()).toBe('AI 设置');
+    expect(settings.get('#ai-settings-title').text()).toBe('为 Memocraft 接入 AI');
     await settings.setProps({ initialSection: 'appearance' });
     expect(selectedTab(settings).text()).toBe('外观');
     expect(settings.get('#settings-panel-ai').attributes('aria-hidden')).toBe('true');

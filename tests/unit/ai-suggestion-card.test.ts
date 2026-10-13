@@ -57,7 +57,7 @@ describe('AI 建议内联卡片', () => {
     expect(card.get('.suggest-content').attributes('aria-busy')).toBe('true');
     expect(card.get('[role="status"]').text()).toBe('正在阅读这条手记…');
     expect(card.text()).toContain('正文前 800 字');
-    expect(card.text()).toContain('会发送给 DeepSeek');
+    expect(card.text()).toContain('会发送到已保存的 AI 服务地址');
     expect(card.find('[role="dialog"]').exists()).toBe(false);
     expect(card.find('.chip').exists()).toBe(false);
     await card.get('[aria-label="关闭 AI 建议"]').trigger('click');
@@ -70,7 +70,7 @@ describe('AI 建议内联卡片', () => {
     await button(card, '学习与思考→').trigger('click');
     expect(card.emitted('apply-tag')).toEqual([['新标签']]);
     expect(card.emitted('open-topic')).toEqual([['topic-1']]);
-    expect(card.text()).toContain('可归入');
+    expect(card.text()).toContain('相关归纳');
     expect(suggestion.tags).toEqual(['已有标签', '新标签']);
   });
 
@@ -106,7 +106,7 @@ describe('AI 建议内联卡片', () => {
       isStale: true,
     });
     expect(card.text()).toContain('没有找到合适的建议');
-    expect(card.text()).toContain('正文或图片已修改，建议可能不再匹配');
+    expect(card.text()).toContain('内容改了，建议可能不再适用');
     expect(card.find('.chip').exists()).toBe(false);
     await button(card, '重新生成').trigger('click');
     expect(card.emitted('retry')).toEqual([[]]);
@@ -114,7 +114,7 @@ describe('AI 建议内联卡片', () => {
 
   it('ready 正文变化显示提示并提供重新生成', async () => {
     const card = mountCard('ready', { isStale: true });
-    expect(card.text()).toContain('正文或图片已修改，建议可能不再匹配');
+    expect(card.text()).toContain('内容改了，建议可能不再适用');
     await button(card, '重新生成').trigger('click');
     expect(card.emitted('retry')).toEqual([[]]);
     await card.setProps({ isStale: false });
@@ -124,7 +124,7 @@ describe('AI 建议内联卡片', () => {
   it('Flash 图片全部参与时不额外提示，隐私说明反映本次发送图片', () => {
     const card = mountCard('ready', { suggestion: { ...suggestion, usedImages: 2 } });
     expect(card.find('.image-feedback').exists()).toBe(false);
-    expect(card.get('.privacy').text()).toContain('本次纳入图片会发送给 DeepSeek');
+    expect(card.get('.privacy').text()).toContain('本次纳入图片会发送到已保存的 AI 服务地址');
   });
 
   it('Pro 带图仅依据文字，空结果仍提示可切换到 Flash', async () => {

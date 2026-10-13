@@ -10,11 +10,11 @@ import {
 } from '@playwright/test';
 
 /**
- * 验收场景 12：随手记可在网格、阅读流、按时间之间切换，按时间可选分段方式；
- * 知识归纳列表可在卡片与目录之间切换。选择记在本机，重启后保持；筛选、打开抽屉在各呈现下照常可用。
+ * 验收场景 12：手记可在网格、阅读流、按时间之间切换，按时间可选分段方式；
+ * 主题归纳列表可在卡片与目录之间切换。选择记在本机，重启后保持；筛选、打开抽屉在各呈现下照常可用。
  * 分段的日期规则（最近一周按天、更早按月、跨年）由单元测试覆盖，这里的手记都是今天新建的。
  */
-test('真实桌面：随手记三种呈现、按时间分段与归纳目录', async () => {
+test('真实桌面：手记三种呈现、按时间分段与归纳目录', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'memocraft-views-'));
   let app: ElectronApplication | undefined;
   const launch = () =>
@@ -31,7 +31,11 @@ test('真实桌面：随手记三种呈现、按时间分段与归纳目录', as
     await stopped;
   };
   const openModule = async (page: Page, name: RegExp, heading: string) => {
-    await page.getByRole('button', { name }).first().click();
+    await page
+      .getByRole('navigation', { name: '主导航' })
+      .getByRole('button', { name })
+      .first()
+      .click();
     await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
     await expect(page.locator('.page-enter-active')).toHaveCount(0);
   };
@@ -55,7 +59,7 @@ test('真实桌面：随手记三种呈现、按时间分段与归纳目录', as
     }
 
     // 默认仍是改版前的网格；网格不分组，因此不显示分段方式。
-    await openModule(page, /随手记/, '随手记');
+    await openModule(page, /^手记/, '手记');
     const layouts = page.getByRole('radiogroup', { name: '呈现方式' });
     await expect(layouts.getByRole('radio', { name: '网格' })).toHaveAttribute(
       'aria-checked',
@@ -116,13 +120,13 @@ test('真实桌面：随手记三种呈现、按时间分段与归纳目录', as
 
     // 归纳：同一条手记收进两个归纳，目录里标「另见 1」。
     const createTopicWith = async (title: string, notes: string[]) => {
-      await openModule(page, /知识归纳/, '知识归纳');
+      await openModule(page, /主题归纳/, '主题归纳');
       await page
         .getByRole('button', { name: /新建归纳/ })
         .first()
         .click();
       const dialog = page.getByRole('dialog', { name: '新建归纳' });
-      await dialog.getByRole('textbox', { name: '标题', exact: true }).fill(title);
+      await dialog.getByRole('textbox', { name: '标题（必填）', exact: true }).fill(title);
       await dialog.getByRole('button', { name: '创建' }).click();
       await expect(page.locator('.detail-title')).toContainText(title);
       await page.locator('.detail-head').getByRole('button', { name: '收录已有手记' }).click();
@@ -135,7 +139,7 @@ test('真实桌面：随手记三种呈现、按时间分段与归纳目录', as
     await createTopicWith('呈现验收归纳甲', ['呈现验收一', '呈现验收二']);
     await createTopicWith('呈现验收归纳乙', ['呈现验收二']);
 
-    await openModule(page, /知识归纳/, '知识归纳');
+    await openModule(page, /主题归纳/, '主题归纳');
     const arrangement = page.getByRole('radiogroup', { name: '排列方式' });
     await expect(arrangement.getByRole('radio', { name: '卡片' })).toHaveAttribute(
       'aria-checked',
@@ -219,20 +223,20 @@ test('真实桌面：随手记三种呈现、按时间分段与归纳目录', as
     await detailLayouts.getByRole('radio', { name: '连读' }).click();
     await expect(page.locator('.doc-sec')).toHaveCount(2);
 
-    // 重启后：随手记仍是按时间 + 一律按天，归纳列表仍是目录，归纳详情仍是连读 + 最早在前。
+    // 重启后：手记仍是按时间 + 一律按天，归纳列表仍是目录，归纳详情仍是连读 + 最早在前。
     await quit(app);
     app = undefined;
     app = await launch();
     const reopened = await app.firstWindow();
     reopened.on('pageerror', (error) => errors.push(error.message));
     await expect(reopened.getByRole('textbox', { name: '手记正文', exact: true })).toBeVisible();
-    await openModule(reopened, /随手记/, '随手记');
+    await openModule(reopened, /^手记/, '手记');
     await expect(
       reopened.getByRole('radiogroup', { name: '呈现方式' }).getByRole('radio', { name: '按时间' }),
     ).toHaveAttribute('aria-checked', 'true');
     await expect(reopened.getByRole('combobox', { name: '按时间分段的方式' })).toHaveValue('days');
     await expect(reopened.locator('.time-group .card')).toHaveCount(3);
-    await openModule(reopened, /知识归纳/, '知识归纳');
+    await openModule(reopened, /主题归纳/, '主题归纳');
     await expect(reopened.locator('.toc-item')).toHaveCount(2);
     await reopened.getByRole('button', { name: '呈现验收归纳甲', exact: true }).click();
     await expect(

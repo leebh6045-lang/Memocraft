@@ -220,7 +220,9 @@ test('真实桌面：搜索问答摘要、来源、缓存、错误和现场取�
     });
     await openSearch(page);
     await input.fill('无关斑马企鹅');
-    await expect(palette.locator('.ai-answer-row')).toContainText('你的手记里还没有关于这个的记录');
+    await expect(palette.locator('.ai-answer-row')).toContainText(
+      '这次没找到相关手记，换个词试试。',
+    );
     expect((await askState(app))?.calls).toBe(0);
     await input.fill('reactive');
     await expect(palette.locator('.ai-summary')).toContainText('<img src=x');

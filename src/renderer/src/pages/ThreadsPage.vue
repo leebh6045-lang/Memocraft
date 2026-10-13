@@ -107,7 +107,7 @@ function showDetail(threadId: string): void {
     void refreshEntries();
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
-  // 与知识归纳一致：卡片标题与详情标题作为共享元素连续移动。
+  // 与主题归纳一致：卡片标题与详情标题作为共享元素连续移动。
   if (document.startViewTransition && !reducedMotion) document.startViewTransition(swap);
   else swap();
 }
@@ -402,7 +402,7 @@ async function removeDirectNote(noteId: string): Promise<void> {
   if (!thread) return;
   if (await props.state.removeNote(thread.id, noteId)) {
     emit('notify', {
-      message: '已取消关联，手记仍在随手记',
+      message: '已取消关联，手记仍保留在「手记」列表中',
       undo: () => {
         void props.state.addNotes(thread.id, [noteId]);
       },
@@ -564,9 +564,7 @@ onBeforeUnmount(() => clearTimeout(saveTimer));
             ＋ 关联手记
           </button>
         </div>
-        <p v-if="!directNotes.length" class="faint small">
-          整个事务的参考资料放这里，不必为它虚构一条动态。
-        </p>
+        <p v-if="!directNotes.length" class="faint small">关联手记，方便以后查找。</p>
         <div v-else class="grid">
           <div v-for="note in directNotes" :key="note.id" class="thread-note">
             <NoteCard :note="note" @open="emit('open-note', note.id)" />
@@ -586,11 +584,11 @@ onBeforeUnmount(() => clearTimeout(saveTimer));
     <AppDialog
       v-if="creating"
       title="新建事务"
-      hint="标题必填，说明与当前概况可以稍后补。允许同名，稳定 ID 才是标识。"
+      hint="给这件事起个名字，其他以后补。"
       @close="creating = false"
     >
       <label class="field"
-        >标题<input
+        >标题（必填）<input
           data-autofocus
           :value="draft.title"
           maxlength="300"
@@ -654,14 +652,17 @@ onBeforeUnmount(() => clearTimeout(saveTimer));
 
     <PickerDialog
       v-if="picking"
-      title="收录手记"
-      hint="搜索并选择要引用或关联的手记，可多选后一次提交。"
+      :title="picking === 'thread' ? '关联手记' : '引用手记'"
+      :hint="picking === 'thread' ? '选择要关联的手记，可以多选。' : '选择要引用的手记，可以多选。'"
       search-label="搜索手记"
       search-placeholder="搜索标题、正文或标签"
       :options="pickerOptions.options"
       :linked-count="pickerOptions.linkedCount"
       empty-text="没有匹配的手记，换个词或先去写一条。"
-      all-linked-text="全部手记都已经在手记库里了。"
+      :all-linked-text="
+        picking === 'thread' ? '现有手记都已关联到这个事务。' : '现有手记都已选为这条动态的引用。'
+      "
+      :confirm-label="picking === 'thread' ? '关联' : '引用'"
       unit="条"
       :busy="props.busy"
       @confirm="confirmPick"
@@ -694,7 +695,7 @@ onBeforeUnmount(() => clearTimeout(saveTimer));
           maxlength="4000"
           placeholder="现在处于什么状态"
           @input="summary = ($event.target as HTMLTextAreaElement).value"
-        /><span class="faint small">由你维护；动态只记录历史，不会自动改写它。</span></label
+        /><span class="faint small">需要时更新，动态不会改动这里。</span></label
       >
       <p class="draft-status" :class="{ error: saveError }" aria-live="polite">
         <span v-if="saveError">{{ saveError }}</span>

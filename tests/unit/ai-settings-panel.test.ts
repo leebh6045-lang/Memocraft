@@ -97,6 +97,26 @@ afterEach(() => {
 });
 
 describe('AI 设置与测试连接', () => {
+  it('配置未知时保持通用标题，读取到无密钥配置才引导接入', async () => {
+    const ai = makeApi();
+    const pending = deferred<Result<AiSettings>>();
+    vi.mocked(ai.loadSettings).mockReturnValueOnce(pending.promise);
+    const panel = await mountPanel(ai);
+    expect(panel.get('#ai-settings-title').text()).toBe('AI 服务');
+    pending.resolve(
+      success({
+        provider: 'deepseek',
+        model: 'deepseek-flash',
+        baseUrl: DEFAULT_AI_BASE_URL,
+        keyConfigured: false,
+        encryptionAvailable: true,
+      }),
+    );
+    await flushPromises();
+    expect(panel.get('#ai-settings-title').text()).toBe('为 Memocraft 接入 AI');
+    expect(panel.find('.feedback.success').exists()).toBe(false);
+  });
+
   it('默认官方地址，保存后规范化回填，空串保存与恢复官方均可用', async () => {
     const ai = makeApi({ keyConfigured: true });
     const panel = await mountPanel(ai);
@@ -267,6 +287,8 @@ describe('AI 设置与测试连接', () => {
     await flushPromises();
     expect(panel.get<HTMLInputElement>('#ai-key').element.value).toBe('');
     expect(panel.text()).toContain('已配置');
+    expect(panel.get('#ai-settings-title').text()).toBe('AI 服务');
+    expect(panel.find('.feedback.success').exists()).toBe(false);
     expect(panel.get('.key-controls .key-saved-notice').text()).toContain('密钥已保存');
     expect(panel.get('.key-saved-notice').text()).toContain('输入框已清空以保护密钥');
     expect(panel.get('.key-status').classes()).toContain('is-configured');
@@ -552,6 +574,7 @@ describe('AI 设置与测试连接', () => {
     await button(panel, '清除密钥').trigger('click');
     await flushPromises();
     expect(panel.text()).toContain('未配置');
+    expect(panel.get('#ai-settings-title').text()).toBe('为 Memocraft 接入 AI');
     expect(panel.get<HTMLSelectElement>('#ai-model').element.value).toBe('deepseek-v4-pro');
     expect(button(panel, '测试连接').attributes('disabled')).toBeDefined();
   });

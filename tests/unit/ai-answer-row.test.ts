@@ -53,7 +53,7 @@ describe('AI 搜索摘要行', () => {
     expect(row.get('[role="status"]').attributes('aria-busy')).toBe('true');
     expect(row.find('[role="dialog"]').exists()).toBe(false);
     await row.setProps({ phase: 'empty' });
-    expect(row.get('[role="status"]').text()).toBe('你的手记里还没有关于这个的记录');
+    expect(row.get('[role="status"]').text()).toBe('这次没找到相关手记，换个词试试。');
     expect(row.find('button').exists()).toBe(false);
   });
 

@@ -98,11 +98,17 @@ export function migrate(database: DatabaseSync, migrationsDirectory: string): vo
     const filename = migrations[index];
     if (!filename) throw new AppError('STORAGE', '数据库迁移文件缺失。');
     const sql = readFileSync(join(migrationsDirectory, filename), 'utf8');
-    // 模式变更、版本推进和完整性检查一起提交，失败时保留迁移前状态。
-    transaction(database, () => {
-      database.exec(sql);
-      database.exec(`PRAGMA user_version = ${index + 1}`);
-      checkIntegrity(database);
-    });
+    // SQLite 重建被引用的父表需在事务外暂时关闭外键执行；提交前仍检查全部关系。
+    // 仅启动迁移使用此窗口，业务写入始终启用外键，失败回滚后也恢复保护。
+    database.exec('PRAGMA foreign_keys = OFF');
+    try {
+      transaction(database, () => {
+        database.exec(sql);
+        database.exec(`PRAGMA user_version = ${index + 1}`);
+        checkIntegrity(database);
+      });
+    } finally {
+      database.exec('PRAGMA foreign_keys = ON');
+    }
   }
 }

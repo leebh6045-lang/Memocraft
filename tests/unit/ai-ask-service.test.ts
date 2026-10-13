@@ -220,6 +220,8 @@ describe('搜索问答服务与来源边界', () => {
     expect(prompt).toContain('[8] "真实标题8"（待办）');
     expect(prompt).toContain('ref 和 reactive 有什么区别');
     expect(prompt).toContain('只依据给出的手记摘录');
+    expect(prompt).toContain('这次找到的手记摘录里，信息不足以回答这个问题。');
+    expect(prompt).not.toContain('你的手记里还没有记录这方面的内容');
     for (const candidate of hits) expect(prompt).not.toContain(candidate.id);
     expect(prompt).not.toContain('test-only-ask-key');
     expect(

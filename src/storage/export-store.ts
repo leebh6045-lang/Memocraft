@@ -235,7 +235,7 @@ function relativeNoteLink(fileName: string | undefined): string {
   return fileName ? `../${DIRECTORIES.notes}/${fileName}` : '#';
 }
 
-/** 分类值来自数据库，导出时按固定四类解析；未知值退回杂项。 */
+/** 分类值来自数据库，导出时按共用分类解析；未知值退回其他。 */
 function categoryOf(value: string): (typeof NOTE_CATEGORIES)[number]['value'] {
   return NOTE_CATEGORIES.find((item) => item.value === value)?.value ?? 'misc';
 }

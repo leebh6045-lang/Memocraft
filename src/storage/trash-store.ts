@@ -80,7 +80,7 @@ export class TrashStore {
       const references = this.notesOfEntry(id);
       effects.push(
         references
-          ? `引用的 ${references} 条手记不受影响，仍留在随手记。`
+          ? `引用的 ${references} 条手记不受影响，仍保留在「手记」列表中。`
           : '这条动态没有引用手记。',
       );
     }

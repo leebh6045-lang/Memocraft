@@ -17,6 +17,8 @@ const props = defineProps<{
   /** 因为已经关联而未列出的条目数量，用来解释「一条都没有」的空状态。 */
   linkedCount: number;
   emptyText: string;
+  /** 搜索无匹配与真正没有候选分别说明，避免误称整个知识库为空。 */
+  searchEmptyText?: string;
   allLinkedText: string;
   /** 计数单位：手记是「条」，归纳是「个」。 */
   unit: string;
@@ -36,9 +38,10 @@ const matched = computed(() => {
   if (!keyword) return props.options;
   return props.options.filter((option) => option.searchText.includes(keyword));
 });
-const emptyReason = computed(() =>
-  !query.value.trim() && props.linkedCount > 0 ? props.allLinkedText : props.emptyText,
-);
+const emptyReason = computed(() => {
+  if (query.value.trim()) return props.searchEmptyText ?? props.emptyText;
+  return props.linkedCount > 0 ? props.allLinkedText : props.emptyText;
+});
 
 function toggle(id: string): void {
   picked.value = picked.value.includes(id)

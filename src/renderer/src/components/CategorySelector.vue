@@ -17,6 +17,7 @@ const selectedIndex = computed(() =>
     role="group"
     aria-label="手记分类"
     :class="{ 'is-disabled': disabled }"
+    :style="{ '--category-count': NOTE_CATEGORIES.length }"
   >
     <span class="seg-thumb" :style="{ '--selected-index': selectedIndex }" aria-hidden="true" />
     <label v-for="category in NOTE_CATEGORIES" :key="category.value" class="category-option">

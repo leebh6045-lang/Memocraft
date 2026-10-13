@@ -25,6 +25,7 @@ import type { Result } from './errors';
 import type { AiApi, AiConfiguration, StoredAiPeriodSummary, PeriodNotesResult } from './ai';
 
 export const CHANNELS = {
+  openHelp: 'help:open',
   load: 'library:load',
   saveDraft: 'notes:save-draft',
   commitDraft: 'notes:commit-draft',
@@ -81,6 +82,8 @@ export const CHANNELS = {
 
 /** 渲染端只获得这些业务能力，不暴露通用 IPC 或文件操作。 */
 export interface MemocraftApi {
+  /** 在系统浏览器打开固定新手指南，不接受外部网址参数。 */
+  openHelp(): Promise<Result<null>>;
   /** 只暴露明确的 AI 配置、测试、建议与问答能力；已保存的密钥不会回传给页面。 */
   ai: AiApi;
   load(): Promise<Result<LibrarySnapshot>>;

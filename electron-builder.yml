@@ -9,7 +9,8 @@ electronDownload:
   mirror: https://registry.npmmirror.com/-/binary/electron/
 # 需要跳过联网下载与校验的构建机（Windows）在打包命令上临时指定本地 Electron 目录，
 # 不把本机路径写进本文件——写进来会让其他机器（macOS 打包）直接报 electronDist 不存在：
-#   pnpm run package:win -c.electronDist=D:/Appout/.cache/electron/electron-v44.4.3-win32-x64
+#   pnpm run package:win --config.electronDist=D:/Appout/.cache/electron/electron-v44.4.3-win32-x64
+# 字段覆盖必须用 --config.<键>=<值>；-c.<键>=<值> 会被 electron-builder 当成配置文件路径。
 # 目录名与 zip 名必须与 electron-builder 的默认预期一致：<目录>/electron-v<版本>-<平台>-<架构>.zip
 directories:
   output: release
@@ -46,3 +47,5 @@ nsis:
   # 保持每用户安装：不需要管理员权限、不弹 UAC。代价是无法装进 Program Files，
   # 想全局安装需改成 true（届时会要求提权）。
   perMachine: false
+  # 卸载向导的「数据处理方式」勾选页，以及更新器安装包暂存的清理，见该文件内说明。
+  include: build/installer.nsh

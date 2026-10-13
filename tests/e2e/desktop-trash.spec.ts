@@ -47,7 +47,7 @@ test('真实桌面：删除影响面、回收站与恢复顺序', async () => {
       .click();
     await page
       .getByRole('dialog', { name: '新建归纳' })
-      .getByRole('textbox', { name: '标题' })
+      .getByRole('textbox', { name: '标题（必填）', exact: true })
       .fill('删除样例归纳');
     await page
       .getByRole('dialog', { name: '新建归纳' })
@@ -70,7 +70,7 @@ test('真实桌面：删除影响面、回收站与恢复顺序', async () => {
       .click();
     await page
       .getByRole('dialog', { name: '新建事务' })
-      .getByRole('textbox', { name: '标题' })
+      .getByRole('textbox', { name: '标题（必填）', exact: true })
       .fill('删除样例事务');
     await page
       .getByRole('dialog', { name: '新建事务' })
@@ -89,7 +89,8 @@ test('真实桌面：删除影响面、回收站与恢复顺序', async () => {
 
     // 删除手记：确认框先列出受影响的收录与引用位置。
     await page
-      .getByRole('button', { name: /随手记/ })
+      .getByRole('navigation', { name: '主导航' })
+      .getByRole('button', { name: /^手记/ })
       .first()
       .click();
     await expect(page.locator('.page-enter-active')).toHaveCount(0);
@@ -119,14 +120,15 @@ test('真实桌面：删除影响面、回收站与恢复顺序', async () => {
     await expect(page.locator('.rows .row')).toHaveCount(0);
     await expect(page.locator('.toast').filter({ hasText: '已恢复手记' })).toBeVisible();
 
-    // 恢复后手记回到随手记，归纳里的收录也原样回来。
+    // 恢复后手记回到手记，归纳里的收录也原样回来。
     await page
-      .getByRole('button', { name: /随手记/ })
+      .getByRole('navigation', { name: '主导航' })
+      .getByRole('button', { name: /^手记/ })
       .first()
       .click();
     await expect(page.locator('.card')).toHaveCount(1);
     await page
-      .getByRole('button', { name: /知识归纳/ })
+      .getByRole('button', { name: /主题归纳/ })
       .first()
       .click();
     await page.locator('.card.collection').first().click();

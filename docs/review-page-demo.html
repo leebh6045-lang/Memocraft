@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Memocraft · 回顾（动效演示）</title>
+<style>
+/* ─── 项目令牌：逐条对照 src/renderer/src/assets/theme.css ─── */
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+  --font: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
+          'Segoe UI', 'Microsoft YaHei', sans-serif;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-1: 140ms; --dur-2: 240ms; --dur-3: 320ms;
+  --radius: 10px; --radius-s: 6px;
+  --nav-w: 224px; --content-w: 820px; --bar-h: 34px;
+  --c-todo: #b8862b; --c-done: #4f8a63; --danger: #b3473f;
+  --bg: #f7f6f3; --surface: #ffffff; --surface-2: #efede8; --surface-3: #e6e3dc;
+  --text: #25242a; --muted: #6d6b73; --faint: #77747e;
+  --border: #e4e1da; --border-strong: #cfcbc2;
+  --accent: #3b5b7c; --accent-soft: #e6edf5; --on-accent: #ffffff;
+  --shadow: 0 1px 2px rgba(20,18,30,.04), 0 6px 20px rgba(20,18,30,.05);
+  --shadow-lg: 0 20px 60px rgba(20,18,30,.18);
+  --glass: rgba(255,255,255,.78);
+}
+[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #17181c; --surface: #1f2025; --surface-2: #282a31; --surface-3: #31343c;
+  --text: #e8e7ec; --muted: #a09fa8; --faint: #93919c;
+  --border: #2e3038; --border-strong: #3e414b;
+  --accent: #8fb0d6; --accent-soft: #25313f; --on-accent: #111318;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  --shadow-lg: 0 24px 70px rgba(0,0,0,.6);
+  --glass: rgba(31,32,37,.8);
+  --c-todo: #d8a94f; --c-done: #7cb98f; --danger: #ed938c;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font: 15px/1.65 var(--font);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+h1,h2,h3,h4,p { margin: 0; }
+h1,h2,h3,h4 { font-weight: 600; letter-spacing: -0.01em; }
+h1 { font-size: 24px; line-height: 1.3; }
+h2 { font-size: 17px; }
+button { cursor: pointer; border: 0; background: transparent; padding: 0;
+         font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
+button:disabled { cursor: default; opacity: .45; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+/* ─── 标题栏 ─────────────────────────────────────────── */
+.titlebar {
+  height: var(--bar-h);
+  background: var(--bg);
+  -webkit-app-region: drag;
+  user-select: none;
+  position: relative;
+  z-index: 20;
+}
+/* ─── 应用骨架 ───────────────────────────────────────── */
+.app {
+  display: grid;
+  grid-template-columns: var(--nav-w) minmax(0, 1fr);
+  height: calc(100vh - var(--bar-h));
+}
+
+/* ─── 侧栏 ───────────────────────────────────────────── */
+.nav {
+  height: 100%;
+  display: flex; flex-direction: column;
+  padding: 26px 14px 56px;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+  overflow: hidden;
+}
+.nav-brand { display: flex; align-items: center; gap: 8px; padding: 4px 12px 0; }
+.brand-mark {
+  width: 22px; height: 22px; flex: 0 0 auto;
+  background: var(--accent); border-radius: 6px;
+  display: grid; place-items: center;
+}
+.brand-mark svg { width: 14px; height: 14px; display: block; }
+.brand-name { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+
+.nav-list { position: relative; display: flex; flex-direction: column; gap: 2px; margin-top: 34px; }
+.nav-ind {
+  position: absolute; left: 0; top: 0; width: 100%;
+  border-radius: 8px; background: var(--surface-2);
+  z-index: 0; pointer-events: none;
+  transition: transform var(--dur-3) var(--ease), height var(--dur-3) var(--ease);
+}
+.nav-item {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; gap: 11px;
+  width: 100%; height: 44px; padding: 10px 12px;
+  border-radius: 8px; color: var(--muted);
+  text-align: left; font-size: 14px;
+  transition: color var(--dur-1) ease, background-color var(--dur-1) ease;
+}
+.nav-item:hover { color: var(--text); }
+.nav-item .nav-icon {
+  width: 18px; height: 18px; flex: none;
+  stroke: currentColor; fill: none; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.nav-item .label { white-space: nowrap; }
+.nav-item .nav-key {
+  margin-left: auto; opacity: 0;
+  font: 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--faint);
+  border: 1px solid var(--border); border-bottom-width: 2px;
+  border-radius: 4px; padding: 2px 5px;
+  transition: opacity var(--dur-2) ease;
+}
+.nav:hover .nav-item .nav-key { opacity: 1; }
+.nav-divider {
+  height: 1px; margin: 12px 0;
+  background: linear-gradient(to right, transparent, var(--border), transparent);
+}
+/* 回顾的选中态：与应用模块一致，只换底色，不做额外强调。 */
+.review-nav-item.active { background: var(--surface-2); color: var(--text); font-weight: 500; }
+.nav-tools { margin-top: auto; display: flex; flex-direction: column; gap: 2px; }
+.nav-tools .nav-item { font-size: 13px; }
+
+/* ─── 分段控件 ───────────────────────────────────────── */
+.seg {
+  position: relative; display: inline-flex; gap: 2px;
+  padding: 3px; border-radius: 8px; background: var(--surface-2);
+  flex-shrink: 0;
+}
+.seg-thumb {
+  position: absolute; top: 3px; left: 3px;
+  height: calc(100% - 6px); width: 64px;
+  border-radius: 6px; background: var(--surface);
+  box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 0 0 1px var(--border);
+  transition: transform var(--dur-3) var(--ease);
+  pointer-events: none;
+}
+.seg button {
+  position: relative; z-index: 1; width: 64px;
+  padding: 5px 12px; border-radius: 6px;
+  font-size: 13px; color: var(--muted);
+  transition: color var(--dur-1) ease;
+}
+.seg button:hover { color: var(--text); }
+.seg button.active { color: var(--text); font-weight: 500; }
+
+/* ─── 主区域 ─────────────────────────────────────────── */
+.main { min-width: 0; overflow-y: auto; scrollbar-gutter: stable; }
+.view { max-width: var(--content-w); margin: 0 auto; padding: 44px 48px 90px; }
+.page-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 16px; margin-bottom: 22px;
+}
+.page-head .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+
+/* ─── 周期选择器（对照 ReviewPeriodPicker.vue）───────── */
+.period-trigger {
+  display: flex; align-items: center; gap: 10px;
+  max-width: 100%; padding: 4px 0;
+  color: var(--text); text-align: left;
+  font-size: 15px; font-weight: 500; line-height: 1.8;
+  transition: color var(--dur-1) ease;
+}
+.period-trigger:hover { color: var(--accent); }
+.period-label { overflow-wrap: anywhere; }
+.period-chevron {
+  flex: none; color: var(--muted);
+  transition: transform var(--dur-2) var(--ease);
+}
+.period-chevron.expanded { transform: rotate(180deg); }
+.section-divider { height: 1px; margin: 28px 0; background: var(--border); }
+
+/* ─── 回顾正文（对照 ReviewPage.vue）─────────────────── */
+.review-content { min-height: 320px; }
+.review-content-frame { display: flow-root; }
+.review-section-title { font-size: 13px; font-weight: 500; color: var(--muted); margin-bottom: 14px; }
+.summary-text { font-size: 15px; line-height: 1.9; color: var(--text); overflow-wrap: anywhere; }
+.summary-text p + p { margin-top: 14px; }
+.summary-text strong { font-weight: 600; }
+.review-suggestions { margin: 0; padding-left: 22px; list-style: disc; }
+.review-suggestions li { line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.review-suggestions li + li { margin-top: 10px; }
+.summary-meta {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-top: 24px; color: var(--muted); font-size: 12px;
+}
+.review-image-receipt { margin-top: 8px; color: var(--muted); font-size: 12px; }
+.btn-ghost {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px; border-radius: 8px; font-size: 13px; color: var(--accent);
+  white-space: nowrap;
+  transition: background-color var(--dur-1) ease, transform var(--dur-1) ease;
+}
+.btn-ghost:hover { background: var(--accent-soft); }
+.btn-ghost:active { transform: scale(.97); }
+
+/* ─── 左下角 ─────────────────────────────────────────── */
+.corner {
+  position: fixed; left: 16px; bottom: 10px; z-index: 6;
+  display: flex; align-items: center; gap: 6px;
+}
+.beta {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--faint); pointer-events: none;
+}
+.beta::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--c-todo);
+  animation: beta-pulse 2.6s ease-out infinite;
+}
+@keyframes beta-pulse {
+  0%  { box-shadow: 0 0 0 0 rgba(184,134,43,.45); }
+  70% { box-shadow: 0 0 0 7px rgba(184,134,43,0); }
+  100%{ box-shadow: 0 0 0 0 rgba(184,134,43,0); }
+}
+.corner-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 8px; color: var(--faint);
+  transition: background-color var(--dur-1) ease, color var(--dur-1) ease;
+}
+.corner-btn:hover { background: var(--surface-2); color: var(--text); }
+.corner-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none;
+                  stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ─── 演示工具栏（非应用的一部分，仅用于切换方案）────── */
+.demo-toolbar {
+  position: fixed; right: 16px; bottom: 14px; z-index: 30;
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 10px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--glass);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+}
+.demo-toolbar .tl-label { font-size: 11px; color: var(--faint); letter-spacing: .04em; }
+.demo-btn {
+  padding: 4px 10px; border-radius: var(--radius-s);
+  font-size: 12px; color: var(--muted); background: var(--surface-2);
+  transition: background-color var(--dur-1) ease, color var(--dur-1) ease;
+}
+.demo-btn:hover { background: var(--surface-3); color: var(--text); }
+.demo-btn.active { background: var(--accent); color: var(--on-accent); }
+.demo-sep { width: 1px; height: 16px; background: var(--border); margin: 0 2px; }
+
+/* ══════════════════════════════════════════════════════
+   动效方案
+   ══════════════════════════════════════════════════════ */
+
+/* 每个目标元素自带 --d（延迟）与 --dur（时长），按 DOM 顺序赋值，
+   避免 nth-child 在嵌套结构里逐层重新计数。 */
+.reveal {
+  animation-duration: var(--dur, .5s);
+  animation-delay: var(--d, 0s);
+  animation-fill-mode: both;
+  animation-timing-function: var(--ease-out);
+}
+
+/* ── A 浮现：分块淡入并轻微上移 ── */
+@keyframes fv-fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+.anim-a .reveal { animation-name: fv-fade-up; }
+
+/* ── B 凝结：模糊到清晰，像洞见从雾里聚拢 ──
+   opacity 先行（0.55 处到达 1），blur 全程匀速收敛（linear），
+   两条曲线分离带来「先浮现、再凝实」的层次感。
+   translateY 幅度压到 5px，重心放在 blur 上而不是位移上。 */
+@keyframes fv-sharpen-opacity {
+  from { opacity: 0; }
+  55%  { opacity: 1; }
+  to   { opacity: 1; }
+}
+@keyframes fv-sharpen-blur {
+  from { filter: blur(8px); transform: translateY(5px); }
+  to   { filter: blur(0);   transform: translateY(0); }
+}
+.anim-b .reveal {
+  opacity: 0;
+  animation:
+    fv-sharpen-opacity var(--dur, .65s) ease both,
+    fv-sharpen-blur    var(--dur, .65s) linear both;
+  animation-delay: var(--d, 0s);
+}
+
+/* ── C 流写：首句逐字落笔，其余内容等光标消失后淡入 ── */
+.anim-c .type-cursor {
+  display: inline-block; width: 2px; height: 1.05em;
+  background: var(--accent); vertical-align: text-bottom;
+  margin-left: 1px;
+  animation: cur-blink .85s step-end infinite;
+}
+@keyframes cur-blink { 50% { opacity: 0; } }
+.anim-c .c-head { animation-name: fv-fade-up; }
+.anim-c .after {
+  opacity: 0; transition: opacity .45s ease;
+}
+.anim-c .after.visible { opacity: 1; }
+
+/* ── D 脉络：内容落定后，关键词依次短暂点亮 ── */
+@keyframes fv-kw-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.anim-d .reveal { animation-name: fv-kw-in; animation-duration: var(--dur, .42s); }
+@keyframes fv-kw-pulse {
+  0%   { color: inherit; }
+  30%  { color: var(--accent); }
+  100% { color: inherit; }
+}
+.anim-d .kw { transition: color .25s ease; }
+.anim-d .kw.lit { animation: fv-kw-pulse 1s ease forwards; }
+
+/* ─── 减少动态 ───────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .reveal, .anim-c .type-cursor, .beta::before { animation: none !important; }
+  .reveal, .anim-c .c-head { opacity: 1 !important; filter: none !important; transform: none !important; }
+  .anim-c .after { opacity: 1 !important; transition: none; }
+}
+
+/* ─── 窄窗口（对照主题里的断点）──────────────────────── */
+@media (max-width: 1050px) { .view { padding-right: 32px; padding-left: 32px; } }
+@media (max-width: 900px) {
+  :root { --nav-w: 190px; }
+  .view { padding: 32px 24px 70px; }
+  .page-head { align-items: flex-start; }
+}
+@media (max-width: 760px) {
+  .app { grid-template-columns: 1fr; }
+  .nav { display: none; }
+  .corner { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- 标题栏：只负责拖动，与应用一致 -->
+<div class="titlebar" aria-hidden="true"></div>
+
+<div class="app">
+
+  <!-- ── 侧栏 ── -->
+  <aside class="nav">
+    <div class="nav-brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 14 14" aria-hidden="true">
+          <rect x="1" y="1.5" width="12" height="2.6" rx="1.3" fill="#fff"/>
+          <rect x="1" y="5.7" width="8.6" height="2.6" rx="1.3" fill="#fff"/>
+          <rect x="1" y="9.9" width="5.4" height="2.6" rx="1.3" fill="#fff"/>
+        </svg>
+      </div>
+      <div class="brand-name">Memocraft</div>
+    </div>
+
+    <nav class="nav-list" aria-label="主导航">
+      <!-- 选中项是「学习回顾」：4 个主项各 46px + divider (1px + 12px*2) = 211px，由实测确认 -->
+      <div class="nav-ind" id="nav-ind"
+           style="transform: translateY(211px); height: 44px"></div>
+
+      <button class="nav-item" type="button">
+        <svg class="nav-icon" viewBox="0 0 18 18"><path d="M2.5 7.2 9 2.4l6.5 4.8v7.4a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z"/><path d="M7 15.6V10h4v5.6"/></svg>
+        <span class="label">首页</span><kbd class="nav-key">⌘1</kbd>
+      </button>
+      <button class="nav-item" type="button">
+        <svg class="nav-icon" viewBox="0 0 18 18"><path d="M5 2.5h8a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1z"/><path d="M6.8 6.2h4.4M6.8 9.2h4.4M6.8 12.2h2.6"/></svg>
+        <span class="label">手记</span><kbd class="nav-key">⌘2</kbd>
+      </button>
+      <button class="nav-item" type="button">
+        <svg class="nav-icon" viewBox="0 0 18 18"><path d="M2.6 4.4h4.2l1.3 1.7h7.3v7.5a1 1 0 0 1-1 1H3.6a1 1 0 0 1-1-1z"/></svg>
+        <span class="label">主题归纳</span><kbd class="nav-key">⌘3</kbd>
+      </button>
+      <button class="nav-item" type="button">
+        <svg class="nav-icon" viewBox="0 0 18 18"><path d="M2.6 4h12.8M2.6 9h12.8M2.6 14h7.4"/></svg>
+        <span class="label">长期事务</span><kbd class="nav-key">⌘4</kbd>
+      </button>
+
+      <div class="nav-divider" aria-hidden="true"></div>
+
+      <button class="nav-item review-nav-item active" type="button" aria-current="page">
+        <svg class="nav-icon" viewBox="0 0 18 18"><rect x="2.4" y="3.4" width="13.2" height="12.2" rx="1.4"/><path d="M2.4 7.2h13.2M6.2 2.2v2.4M11.8 2.2v2.4"/></svg>
+        <span class="label">回顾</span>
+      </button>
+    </nav>
+
+    <div class="nav-tools">
+      <button class="nav-item" type="button">
+        <svg class="nav-icon" viewBox="0 0 18 18"><circle cx="8" cy="8" r="4.6"/><path d="M11.4 11.4 15.2 15.2"/></svg>
+        <span class="label">搜索</span><kbd class="nav-key">⌘K</kbd>
+      </button>
+      <button class="nav-item" type="button">
+        <svg class="nav-icon" viewBox="0 0 18 18"><circle cx="9" cy="9" r="3.2"/><path d="M9 1.8v1.8M9 14.4v1.8M1.8 9h1.8M14.4 9h1.8M3.9 3.9l1.3 1.3M12.8 12.8l1.3 1.3M14.1 3.9l-1.3 1.3M5.2 12.8l-1.3 1.3"/></svg>
+        <span class="label">专注模式</span><kbd class="nav-key">Esc</kbd>
+      </button>
+      <button class="nav-item" type="button" id="theme-nav-btn">
+        <svg class="nav-icon" viewBox="0 0 18 18"><path d="M15 10.6A6.4 6.4 0 0 1 7.4 3a6.4 6.4 0 1 0 7.6 7.6z"/></svg>
+        <span class="label">深色</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ── 主区域 ── -->
+  <main class="main">
+    <section class="view">
+
+      <header class="page-head">
+        <div>
+          <h1>回顾</h1>
+          <p class="sub">回看一段时间的手记积累，找出值得继续推进的事。</p>
+        </div>
+        <div class="seg" role="tablist" aria-label="回顾周期">
+          <span class="seg-thumb" id="seg-thumb" aria-hidden="true"></span>
+          <button type="button" role="tab" class="active" id="tab-week"  aria-selected="true"  onclick="switchPeriod('week')">按周</button>
+          <button type="button" role="tab" id="tab-month" aria-selected="false" onclick="switchPeriod('month')">按月</button>
+        </div>
+      </header>
+
+      <button class="period-trigger" type="button" id="period-trigger"
+              aria-haspopup="listbox" aria-expanded="false">
+        <span class="period-label" id="period-label">2026年第40周（9月28日–10月4日）</span>
+        <svg class="period-chevron" id="period-chevron" width="16" height="16" viewBox="0 0 16 16"
+             fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M5 7l3 3 3-3"/>
+        </svg>
+      </button>
+
+      <div class="section-divider" aria-hidden="true"></div>
+
+      <!-- 回顾内容：由脚本按当前方案重建 -->
+      <div class="review-content" id="review-content" aria-live="polite"></div>
+
+    </section>
+  </main>
+</div>
+
+<!-- 左下角：发行标识与辅助入口 -->
+<div class="corner">
+  <span class="beta">内测中</span>
+  <button class="corner-btn" type="button" title="回收站" aria-label="回收站">
+    <svg viewBox="0 0 18 18"><path d="M3.4 5.4h11.2M7 5.4V3.8a.8.8 0 0 1 .8-.8h2.4a.8.8 0 0 1 .8.8v1.6M5 5.4l.7 9a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9l.7-9"/></svg>
+  </button>
+  <button class="corner-btn" type="button" title="设置" aria-label="设置">
+    <svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="2.4"/><path d="M9 2.2v1.6M9 14.2v1.6M2.2 9h1.6M14.2 9h1.6M4.2 4.2l1.1 1.1M12.7 12.7l1.1 1.1M13.8 4.2l-1.1 1.1M5.3 12.7l-1.1 1.1"/></svg>
+  </button>
+</div>
+
+<!-- 演示工具栏：只用于切换方案，不属于应用界面 -->
+<div class="demo-toolbar">
+  <span class="tl-label">动效</span>
+  <button class="demo-btn active" data-anim="a" type="button">浮现</button>
+  <button class="demo-btn" data-anim="b" type="button">凝结</button>
+  <button class="demo-btn" data-anim="c" type="button">流写</button>
+  <button class="demo-btn" data-anim="d" type="button">脉络</button>
+  <span class="demo-sep"></span>
+  <button class="demo-btn" type="button" id="replay-btn">↺ 重播</button>
+</div>
+
+<script>
+/* ── 演示数据：取自当前项目的一次真实回顾 ─────────────── */
+const PARA_1 = '本期积累呈现清晰的主线：<strong>网络协议</strong>是最集中的方向，10 条手记里既有 ICMP 协议从消息类型到错误报告机制的系统梳理，也有代理与 VPN 在应用层、网络层、虚拟网卡和路由改写上的对比辨析，还延伸到 OSI 七层与 TCP/IP 四层的分层对应，说明对网络通信路径的理解已经不只是零散概念。';
+const PARA_2 = '<strong>计算机组成原理</strong>与 C 语言也各成一块，前者有复习动作，后者涉及进阶基础与练习复盘；<strong>Linux 方向</strong>则通过文件结构图和发行版家族图补充了系统层面的基础知识，整体处于从语法入门向系统原理和项目实践过渡的阶段。另有几份待办和规划记录，把 Python、SQL、JS、Vue、Electron 以及 MCP、SSH 等排入后续，方向虽多但意图明确。';
+const FLAT_1 = '本期积累呈现清晰的主线：网络协议是最集中的方向，10 条手记里既有 ICMP 协议从消息类型到错误报告机制的系统梳理，也有代理与 VPN 在应用层、网络层、虚拟网卡和路由改写上的对比辨析，还延伸到 OSI 七层与 TCP/IP 四层的分层对应，说明对网络通信路径的理解已经不只是零散概念。';
+
+const SUGGESTIONS = [
+  '网络协议归纳已有 10 条，可把 ICMP、代理/VPN、OSI/TCP-IP 三份内容合并成一份分层笔记，作为后续复习锚点。',
+  '超时待办已有 8 条，建议优先处理 7 天以上的旧项，把"完成简历"与"10.3 路线梳理"拆分出下一步动作。',
+  'C 语言相关的 6 条手记中进阶与练习居多，可给练习内容单独建一个归纳，减少基础备忘与深入掌握混放。',
+  '计算机组成原理只有 5 条且偏复习，建议在这块补一条本期最核心的原理自述，检验是否真的能复述。',
+  'Linux 的发行版与文件结构已配图，可照同样方式给 MCP、SSH 建立带机制图的条目，避免停留在条目名。',
+];
+
+/* 脉络方案里被「提炼」的关键词。 */
+const KW_1 = '本期积累呈现清晰的主线：<span class="kw">网络协议</span>是最集中的方向，10 条手记里既有 <span class="kw">ICMP 协议</span>从消息类型到错误报告机制的系统梳理，也有<span class="kw">代理与 VPN</span> 在应用层、网络层、虚拟网卡和路由改写上的对比辨析，还延伸到 OSI 七层与 TCP/IP 四层的分层对应，说明对网络通信路径的理解已经不只是零散概念。';
+const KW_2 = '<span class="kw">计算机组成原理</span>与 <span class="kw">C 语言</span>也各成一块，前者有复习动作，后者涉及进阶基础与练习复盘；<strong>Linux 方向</strong>则通过文件结构图和发行版家族图补充了系统层面的基础知识，整体处于从语法入门向系统原理和项目实践过渡的阶段。另有几份待办和规划记录，把 Python、SQL、JS、Vue、Electron 以及 MCP、SSH 等排入后续，方向虽多但意图明确。';
+
+let currentAnim = 'a';
+let typeTimer = null;
+let kwTimers = [];
+
+/* ── 元素工厂：每个待揭示的块自带延迟 --d ─────────────── */
+function section(title, bodyHtml, delay) {
+  return `<section class="review-section">
+    <h2 class="review-section-title reveal" style="--d:${delay}s;--dur:.45s">${title}</h2>
+    <div class="summary-text reveal" style="--d:${delay + .12}s;--dur:.55s">${bodyHtml}</div>
+  </section>`;
+}
+function suggestionsBlock(delay) {
+  return `<section class="review-section reveal" style="--d:${delay}s;--dur:.5s">
+    <h2 class="review-section-title">推荐</h2>
+    <ul class="review-suggestions">${SUGGESTIONS.map(s => `<li>${s}</li>`).join('')}</ul>
+  </section>`;
+}
+function footerBlock(delay, cls = '') {
+  return `<footer class="summary-meta ${cls}" style="--d:${delay}s;--dur:.5s">
+    <div>
+      <span>覆盖 32 条手记</span>
+      <span aria-hidden="true"> · </span>
+      <span>上次生成于今天 21:06</span>
+    </div>
+    <button class="btn-ghost" type="button">重新生成</button>
+  </footer>
+  <p class="review-image-receipt ${cls}" style="--d:${delay + .1}s;--dur:.5s">有 1 张图片未参与本次回顾。</p>`;
+}
+
+/* ── 按方案渲染回顾内容 ────────────────────────────────── */
+function buildContent(anim) {
+  const host = document.getElementById('review-content');
+  host.className = `review-content anim-${anim}`;
+  clearTimers();
+
+  if (anim === 'c') {
+    /* 流写：标题与首句由脚本逐字写出，其余内容等落笔结束后淡入。 */
+    host.innerHTML = `
+      <section class="review-section">
+        <h2 class="review-section-title reveal c-head" style="--d:0s;--dur:.4s">总结</h2>
+        <div class="summary-text">
+          <p id="type-target"></p>
+          <p class="after" id="after-para">${PARA_2}</p>
+        </div>
+      </section>
+      <div class="section-divider after"></div>
+      <section class="review-section after">
+        <h2 class="review-section-title">推荐</h2>
+        <ul class="review-suggestions">${SUGGESTIONS.map(s => `<li>${s}</li>`).join('')}</ul>
+      </section>
+      <footer class="summary-meta after">
+        <div>
+          <span>覆盖 32 条手记</span>
+          <span aria-hidden="true"> · </span>
+          <span>上次生成于今天 21:06</span>
+        </div>
+        <button class="btn-ghost" type="button">重新生成</button>
+      </footer>
+      <p class="review-image-receipt after">有 1 张图片未参与本次回顾。</p>`;
+    runTypewriter();
+    return;
+  }
+
+  if (anim === 'd') {
+    host.innerHTML =
+      section('总结', `<p>${KW_1}</p><p>${KW_2}</p>`, .05) +
+      '<div class="section-divider reveal" style="--d:.62s;--dur:.4s" aria-hidden="true"></div>' +
+      suggestionsBlock(.74) +
+      footerBlock(.9);
+    scheduleKeywordPulse();
+    return;
+  }
+
+  /* 浮现 / 凝结：同样分块，只有动画曲线不同。 */
+  host.innerHTML =
+    section('总结', `<p>${PARA_1}</p><p>${PARA_2}</p>`, anim === 'b' ? .0 : .05) +
+    '<div class="section-divider reveal" style="--d:' + (anim === 'b' ? .5 : .42) + 's;--dur:.4s" aria-hidden="true"></div>' +
+    suggestionsBlock(anim === 'b' ? .62 : .52) +
+    footerBlock(anim === 'b' ? .8 : .68);
+}
+
+/* ── 流写 ─────────────────────────────────────────────── */
+function runTypewriter() {
+  const target = document.getElementById('type-target');
+  if (!target) return;
+  target.innerHTML = '<span class="type-cursor"></span>';
+  const cursor = target.querySelector('.type-cursor');
+  const chars = [...FLAT_1];
+  let i = 0;
+
+  typeTimer = setTimeout(() => {
+    typeTimer = setInterval(() => {
+      target.insertBefore(document.createTextNode(chars[i]), cursor);
+      i += 1;
+      if (i >= chars.length) {
+        clearInterval(typeTimer);
+        typeTimer = setTimeout(() => {
+          cursor.remove();
+          document.querySelectorAll('#review-content .after')
+            .forEach((el) => el.classList.add('visible'));
+        }, 360);
+      }
+    }, 38);
+  }, 420);
+}
+
+/* ── 脉络 ─────────────────────────────────────────────── */
+function scheduleKeywordPulse() {
+  // 最后一个 reveal 的 --d 是 0.9s、时长 0.5s，约 1.5s 后正文已落定。
+  let delay = 1500;
+  document.querySelectorAll('#review-content .kw').forEach((kw) => {
+    kwTimers.push(setTimeout(() => {
+      kw.classList.add('lit');
+    }, delay));
+    delay += 460;
+  });
+}
+
+function clearTimers() {
+  clearTimeout(typeTimer);
+  clearInterval(typeTimer);
+  typeTimer = null;
+  kwTimers.forEach(clearTimeout);
+  kwTimers = [];
+}
+
+/* ── 交互 ─────────────────────────────────────────────── */
+function setAnim(anim) {
+  currentAnim = anim;
+  document.querySelectorAll('[data-anim]').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.anim === anim);
+  });
+  buildContent(anim);
+}
+
+function switchPeriod(type) {
+  const week = type === 'week';
+  document.getElementById('tab-week').classList.toggle('active', week);
+  document.getElementById('tab-month').classList.toggle('active', !week);
+  document.getElementById('tab-week').setAttribute('aria-selected', String(week));
+  document.getElementById('tab-month').setAttribute('aria-selected', String(!week));
+  document.getElementById('seg-thumb').style.transform = week ? 'translateX(0)' : 'translateX(66px)';
+  document.getElementById('period-label').textContent =
+    week ? '2026年第40周（9月28日–10月4日）' : '2026年9月';
+  buildContent(currentAnim);
+}
+
+/* 主题与项目里一样挂在 :root 的 data-theme 上。 */
+function toggleTheme() {
+  const root = document.documentElement;
+  const dark = root.getAttribute('data-theme') === 'dark';
+  root.setAttribute('data-theme', dark ? 'light' : 'dark');
+  const label = document.querySelector('#theme-nav-btn .label');
+  if (label) label.textContent = dark ? '深色' : '浅色';
+}
+
+/* ── 周期下拉：真实展开，复用 .period-menu 的样式 ─────── */
+const PERIODS = [
+  { start: '2026-09-28', label: '2026年第40周（9月28日–10月4日）', current: true },
+  { start: '2026-09-21', label: '2026年第39周（9月21日–9月27日）', current: false },
+  { start: '2026-09-14', label: '2026年第38周（9月14日–9月20日）', current: false },
+];
+let menuOpen = false;
+
+function buildMenu() {
+  const trigger = document.getElementById('period-trigger');
+  const menu = document.createElement('div');
+  menu.className = 'period-menu';
+  menu.id = 'period-menu';
+  menu.setAttribute('role', 'listbox');
+  menu.setAttribute('aria-label', '选择回顾时间段');
+  menu.innerHTML = PERIODS.map((p) => `
+    <button class="period-option" type="button" role="option"
+            aria-selected="${p.current}" data-start="${p.start}">
+      <span class="period-check" aria-hidden="true">
+        ${p.current ? '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.4 6.4 12 13 4.6"/></svg>' : ''}
+      </span>
+      <span class="period-option-label">${p.label}</span>
+      ${p.current ? '<span class="period-current">本周</span>' : ''}
+    </button>`).join('');
+  menu.hidden = true;
+  trigger.insertAdjacentElement('afterend', menu);
+  menu.addEventListener('click', (event) => {
+    const option = event.target.closest('.period-option');
+    if (!option) return;
+    document.getElementById('period-label').textContent =
+      PERIODS.find((p) => p.start === option.dataset.start).label;
+    closeMenu();
+    buildContent(currentAnim);
+  });
+}
+function openMenu() {
+  menuOpen = true;
+  document.getElementById('period-menu').hidden = false;
+  document.getElementById('period-trigger').setAttribute('aria-expanded', 'true');
+  document.getElementById('period-chevron').classList.add('expanded');
+}
+function closeMenu() {
+  menuOpen = false;
+  document.getElementById('period-menu').hidden = true;
+  document.getElementById('period-trigger').setAttribute('aria-expanded', 'false');
+  document.getElementById('period-chevron').classList.remove('expanded');
+}
+
+/* ── 绑定 ─────────────────────────────────────────────── */
+document.querySelectorAll('[data-anim]').forEach((btn) => {
+  btn.addEventListener('click', () => setAnim(btn.dataset.anim));
+});
+document.getElementById('replay-btn').addEventListener('click', () => buildContent(currentAnim));
+document.getElementById('theme-nav-btn').addEventListener('click', toggleTheme);
+document.getElementById('period-trigger').addEventListener('click', () => {
+  menuOpen ? closeMenu() : openMenu();
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && menuOpen) closeMenu();
+});
+
+/* 首次进入按「浮现」渲染，与切页时的第一印象一致。 */
+buildContent('a');
+buildMenu();
+</script>
+</body>
+</html>

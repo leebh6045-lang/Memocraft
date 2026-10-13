@@ -2,7 +2,7 @@ import type { Note } from '../../domain/note';
 import type { TimelineGrain } from './view-preferences';
 
 /**
- * 随手记「按时间」呈现的分段：按本机时区的日历日或月份把手记切成几段。
+ * 手记「按时间」呈现的分段：按本机时区的日历日或月份把手记切成几段。
  * 只决定怎么分组，不改变顺序——段的先后与段内顺序都沿用传入列表（创建时间倒序）。
  */
 export interface TimelineGroup {

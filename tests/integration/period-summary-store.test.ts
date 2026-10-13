@@ -203,7 +203,7 @@ describe('周期手记与事实统计', () => {
     expect(result.total).toBe(2);
   });
 
-  it('过期待办统计来自全库，严格超过 7 天且排除完成、杂项和已删除手记', () => {
+  it('过期待办统计来自全库，严格超过 7 天且排除完成、思绪、其他和已删除手记', () => {
     const notes = open();
     note(notes, '2026-09-01T00:00:00.000Z', { category: 'todo' });
     note(notes, '2026-10-04T03:59:59.999Z', { category: 'todo' });
@@ -211,6 +211,7 @@ describe('周期手记与事实统计', () => {
     note(notes, query.startAt, { category: 'todo' });
     note(notes, '2026-09-01T00:00:00.000Z', { category: 'done' });
     note(notes, '2026-09-01T00:00:00.000Z', { category: 'misc' });
+    note(notes, '2026-09-01T00:00:00.000Z', { category: 'thought' });
     const deleted = note(notes, '2026-09-01T00:00:00.000Z', { category: 'todo' });
     notes.remove(deleted.id);
     const periods = new PeriodSummaryStore(notes.connection());
