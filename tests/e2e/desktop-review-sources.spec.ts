@@ -1,3 +1,4 @@
+import { waitForMainWindow } from './main-window';
 import { mkdtemp, mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -167,7 +168,7 @@ async function attach(
   shellDirectory: string,
   errors: string[],
 ): Promise<Page> {
-  const page = await app.firstWindow();
+  const page = await waitForMainWindow(app);
   page.on('pageerror', (error) => errors.push(error.message));
   expect(await app.evaluate(({ app }) => app.getPath('userData'))).toBe(shellDirectory);
   await expect(page.getByRole('textbox', { name: '手记正文', exact: true })).toBeVisible();

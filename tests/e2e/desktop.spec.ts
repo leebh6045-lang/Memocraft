@@ -1,3 +1,4 @@
+import { waitForMainWindow } from './main-window';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -24,7 +25,7 @@ test('真实桌面：草稿重启、五分类、保存、搜索、抽屉编辑�
   };
   try {
     app = await launch();
-    let page = await app.firstWindow();
+    let page = await waitForMainWindow(app);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await expect(page.getByRole('heading', { name: '新建手记', exact: true })).toBeVisible();
@@ -67,7 +68,7 @@ test('真实桌面：草稿重启、五分类、保存、搜索、抽屉编辑�
     await quit(app);
     app = undefined;
     app = await launch();
-    page = await app.firstWindow();
+    page = await waitForMainWindow(app);
     page.on('pageerror', (error) => errors.push(error.message));
     await expect(page.getByRole('textbox', { name: '手记正文', exact: true })).toHaveValue(
       '尚未提交的中文草稿 📝\n保留第二行',
@@ -178,7 +179,7 @@ test('真实桌面：草稿重启、五分类、保存、搜索、抽屉编辑�
     await quit(app);
     app = undefined;
     app = await launch();
-    page = await app.firstWindow();
+    page = await waitForMainWindow(app);
     await expect(page.getByRole('textbox', { name: '手记正文', exact: true })).toHaveValue(
       '独立首页草稿',
     );
@@ -211,7 +212,7 @@ test('真实写入失败：保留正文、阻止离开与关闭，修复后可�
     }
   };
   try {
-    const page = await app.firstWindow();
+    const page = await waitForMainWindow(app);
     await expect(page.getByRole('heading', { name: '新建手记', exact: true })).toBeVisible();
     mutate(
       "CREATE TRIGGER fail_draft BEFORE INSERT ON note_drafts BEGIN SELECT RAISE(ABORT, 'isolated write failure'); END;",

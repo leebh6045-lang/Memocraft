@@ -1,3 +1,4 @@
+import { waitForMainWindow } from './main-window';
 import {
   existsSync,
   mkdirSync,
@@ -53,7 +54,7 @@ test('真实桌面：备份、恢复、损坏备份拒绝与可读导出', async
 
   try {
     app = await launch();
-    const page = await app.firstWindow();
+    const page = await waitForMainWindow(app);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     const body = page.getByRole('textbox', { name: '手记正文', exact: true });
@@ -171,7 +172,7 @@ test('真实桌面：备份、恢复、损坏备份拒绝与可读导出', async
     await quit(app);
     app = undefined;
     app = await launch();
-    const reopened = await app.firstWindow();
+    const reopened = await waitForMainWindow(app);
     reopened.on('pageerror', (error) => errors.push(error.message));
     await expect(
       reopened.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: /^手记/ }),

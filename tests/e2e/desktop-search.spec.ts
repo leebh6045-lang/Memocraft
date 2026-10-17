@@ -1,3 +1,4 @@
+import { waitForMainWindow } from './main-window';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -26,7 +27,7 @@ test('真实桌面：全对象搜索、命中高亮与结果定位', async () =>
 
   try {
     app = await launch();
-    const page = await app.firstWindow();
+    const page = await waitForMainWindow(app);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     const body = page.getByRole('textbox', { name: '手记正文', exact: true });

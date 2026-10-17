@@ -1,5 +1,23 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { CHANNELS, type MemocraftApi } from '../shared/contracts';
+import {
+  STARTUP_WINDOW_ARGUMENT,
+  WINDOW_CONTENT_READY,
+  WINDOW_PRESENTED,
+  type WindowLifecycleApi,
+} from '../shared/window-lifecycle';
+
+const lifecycle: WindowLifecycleApi = {
+  ready: (theme) => ipcRenderer.send(WINDOW_CONTENT_READY, theme),
+  onPresented: (listener) => {
+    const handler = (_event: unknown, animate: unknown): void => {
+      if (typeof animate === 'boolean') listener(animate);
+    };
+    ipcRenderer.on(WINDOW_PRESENTED, handler);
+    return () => ipcRenderer.removeListener(WINDOW_PRESENTED, handler);
+  },
+};
+contextBridge.exposeInMainWorld('memocraftWindow', lifecycle);
 
 // 桥接层仅转发白名单调用；输入校验与业务规则在主进程侧执行。
 const api: MemocraftApi = {
@@ -82,4 +100,7 @@ const api: MemocraftApi = {
   platform:
     process.platform === 'darwin' ? 'mac' : process.platform === 'win32' ? 'windows' : 'linux',
 };
-contextBridge.exposeInMainWorld('memocraft', api);
+// 独立卡片共用同源外观偏好，但不能获得主界面的知识库业务能力。
+if (!process.argv.includes(STARTUP_WINDOW_ARGUMENT)) {
+  contextBridge.exposeInMainWorld('memocraft', api);
+}

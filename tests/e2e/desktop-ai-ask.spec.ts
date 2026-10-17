@@ -1,3 +1,4 @@
+import { waitForMainWindow } from './main-window';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -133,7 +134,7 @@ test('真实桌面：搜索问答摘要、来源、缓存、错误和现场取�
     });
   try {
     app = await launch();
-    const page = await app.firstWindow();
+    const page = await waitForMainWindow(app);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await expect(page.getByRole('textbox', { name: '手记正文', exact: true })).toBeVisible();
@@ -333,7 +334,7 @@ test('真实桌面：恢复暂停、取消白名单、失败回滚和关闭排�
   try {
     app = await launch();
     const firstApp = app;
-    const page = await app.firstWindow();
+    const page = await waitForMainWindow(app);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await expect(page.getByRole('textbox', { name: '手记正文', exact: true })).toBeVisible();
@@ -430,7 +431,7 @@ test('真实桌面：恢复暂停、取消白名单、失败回滚和关闭排�
     expect(stdout).toContain('MEMOCRAFT_ASK_QUIT:{"calls":1,"aborted":true}');
     expect(errors).toEqual([]);
     app = await launch();
-    const reopened = await app.firstWindow();
+    const reopened = await waitForMainWindow(app);
     await expect(reopened.getByRole('textbox', { name: '手记正文', exact: true })).toBeVisible();
     await expect(reopened.getByRole('dialog', { name: '全局搜索' })).toHaveCount(0);
     await expect(reopened.locator('.ai-answer-row')).toHaveCount(0);

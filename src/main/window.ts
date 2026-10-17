@@ -38,7 +38,7 @@ export function createWindow(): BrowserWindow {
     callback(false),
   );
   window.webContents.session.setPermissionCheckHandler(() => false);
-  window.once('ready-to-show', () => window.show());
+  // 初次显示交由启动协调器处理，防止 activate 或首帧事件提前露出主窗口。
   return window;
 }
 

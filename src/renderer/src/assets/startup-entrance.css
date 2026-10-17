@@ -1,0 +1,12 @@
+/* 只在隐藏主窗口准备时预置透明；原生显示通知到达后由一次性动画接管。 */
+html[data-startup-entrance='pending'] [data-startup-part='shell'],
+html[data-startup-entrance='pending'] [data-startup-part='corner'] {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-startup-entrance='pending'] [data-startup-part='shell'],
+  html[data-startup-entrance='pending'] [data-startup-part='corner'] {
+    opacity: 1;
+  }
+}

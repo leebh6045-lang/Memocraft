@@ -1,6 +1,6 @@
 ---
 created: 2026-10-13
-completed: 2026-10-13
+completed: 2026-10-15
 status: delivered
 feature: packaging
 related:
@@ -20,11 +20,17 @@ related:
 
 ### 卸载数据处理
 
-`build/installer.nsh` 新增自定义卸载页，通过 electron-builder 的 `nsis.include` 接入（`electron-builder.yml`）。
+`build/installer.nsh` 新增自定义卸载页，经 `electron-builder.yml` 的 `nsis.include` 接入。
 
-页面提供单个复选框：勾选则删除 `%APPDATA%\memocraft`（数据库、手记图片、AI 密钥、缓存）；不勾选只移除程序本体。默认不勾选——卸载时保留知识库是安全默认值。
+页面提供单个复选框：勾选则删除 `%APPDATA%\memocraft`（数据库、`data\attachments` 图片、AI 密钥、全部浏览器缓存）；不勾选只移除程序本体。默认不勾选——卸载时保留知识库是安全默认值。
 
-删除逻辑不依赖 electron-builder 自带的 `$isDeleteAppData`：模板在 `uninstaller.nsh` 的 Section 内部（第 216 行）才声明该变量，而 `customUnInstall` 在第 157 行展开，早于声明；引用它会得到「只报行号、不报原因」的编译失败，由本文件提前声明又会与模板冲突（`variable already declared`）。因此本文件自己承接勾选结果并执行删除，删除目标与模板保持一致，并保留 `--delete-app-data` 命令行参数语义。
+**勾选结果用临时标记文件传递**，不用寄存器或自定义变量。页面离开时把 `delete` / `keep` 写入 `%TEMP%\memocraft-uninstall-choice.txt`，卸载区段读取后立即删除该文件。这样做的原因：
+
+- 寄存器（`$R9`）与自定义 `Var` 在 electron-builder 的宏展开时机下都出现过编译失败或状态丢失（详见下方约束表）；
+- **SSH 会话无法渲染 GUI**，勾选路径无法用截图或点击自动化验证；标记文件是可见产物，失败时能区分「没写」与「没读到」；
+- 页面未显示时（静默卸载、更新）标记不存在，语义自然退回「保留数据」。
+
+`--delete-app-data` 命令行参数仍然生效，保持与 electron-builder 原有约定一致。
 
 ### Windows 菜单
 
@@ -32,40 +38,38 @@ related:
 
 ## NSIS 定制约束（再次修改本节前必读）
 
-以下每条都对应一次实际编译失败，症状都是「只报行号、不报原因」，排查成本很高：
+以下每条都对应一次实际编译失败或线上缺陷，症状多为「只报行号、不报原因」，排查成本很高：
 
-| 约束 | 原因 | 症状 |
-| --- | --- | --- |
-| 必须 `!include LogicLib.nsh` | electron-builder 模板使用 `${If}`/`${IfNot}`，但自身不引入 LogicLib | 模板报未定义宏 |
-| 勾选状态用内置寄存器 `$R9` 传递，不用自定义 `Var` | 自定义变量在宏展开时的可见性受 include 注入时机影响 | `Error in macro customUnInstall on macroline N` |
-| 页面函数内不引用 `$isDeleteAppData` | `installer.nsi` 第 40 行先加载页面宏，第 131 行才声明该变量 | 同上，行号指向 `StrCpy` |
-| `NSD_GetState` 必须传两个参数 | 少传输出变量时宏展开越界 | 行号指向该调用 |
-| 不定义 `customRemoveFiles` | 模板在该宏存在时跳过自带的文件与快捷方式删除逻辑（`uninstaller.nsh` 第 161-163 行 `!ifmacrodef/!else`） | 程序本体删不掉 |
-| 不要期望 makensis 打印具体原因 | 未声明变量、参数不足等都只给行号 | 需用二分/最小化实验定位 |
+| 约束 | 原因 |
+| --- | --- |
+| 必须 `!include LogicLib.nsh` | 模板使用 `${If}`/`${IfNot}`，但自身不引入 LogicLib |
+| 勾选结果不要用寄存器或自定义 Var 传递 | 宏展开作用域下状态不可靠；自定义 Var 还会触发 `warning 6001`，而 electron-builder 把警告当错误 |
+| 页面函数内不引用 `$isDeleteAppData` | `installer.nsi` 第 40 行先加载页面宏，第 131 行才声明该变量 |
+| `NSD_GetState` 必须传两个参数 | 少传输出变量时宏展开越界 |
+| 不定义 `customRemoveFiles` | 模板在该宏存在时会跳过自带的文件与快捷方式删除逻辑（`uninstaller.nsh` 第 161-163 行 `!ifmacrodef/!else`），导致程序本体删不掉 |
+| 顶层不放可执行指令 | 只有 Section/Function 内可执行；顶层 `StrCpy` 报 `not valid outside Section or Function` |
 
-排查方法：删减宏体二分定位；`/V4` 加 `!echo` 观察；把出问题的宏体复制到独立脚本，用与构建相同的参数（`/INPUTCHARSET UTF8`、`/DAPP_PACKAGE_NAME=...`）单独编译。
+排查方法：删减宏体二分定位；把出问题的宏体复制到独立脚本，用与构建相同的参数（`/INPUTCHARSET UTF8`、`/DAPP_PACKAGE_NAME=...`）单独编译；`!echo` 只对 `!define` 有效，不能用来探测 `!macro` 是否存在。
 
 ## 实际验证
 
 构建：`pnpm run package:win --config.electronDist=...`（`clean:release` → `build` → `electron-builder --win nsis`），退出码 0，产物 `Memocraft-0.2.0-x64.exe`（109.61 MB）。
 
-| 项目 | 结果 |
-| --- | --- |
-| NSIS 编译 | 通过；`oneClick=false perMachine=false`（向导与自选路径保留） |
-| 菜单改动进入产物 | `out/main/index.js` 含 `setApplicationMenu(null)` |
-| 默认卸载（不勾选） | 程序目录、开始菜单与桌面快捷方式、注册表项全部清除；**数据目录与哨兵文件保留** |
-| `--delete-app-data` 卸载 | 上述全部清除，**数据目录与哨兵文件一并删除**；更新器缓存 `%LOCALAPPDATA%\memocraft-updater` 清除 |
-| 卸载器时序 | 注册表清理在卸载器退出后数秒内完成；过早检查会看到「残留」，属误判 |
+| 场景 | 程序目录 | 数据库 | attachments 图片 | 浏览器缓存 | 更新器缓存 | 标记文件 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 标记 `delete`（勾选） | 已删 | 已删 | 已删 | 已删 | 已删 | 已清理 |
+| 标记 `keep`（不勾选） | 已删 | 保留 | 保留 | — | — | 已清理 |
+| 无标记（静默卸载） | 已删 | 保留 | 保留 | — | — | 不存在 |
 
-验证方式：在真实用户目录放置哨兵文件 `%APPDATA%\memocraft\data\canary.txt`，对比两种卸载后它是否存在。删除路径通过 `--delete-app-data` 参数验证——该分支与复选框设置的是同一处置逻辑。
+删除路径用 109 个真实图片文件与数据库一起验证，确认 `data\attachments` 与 `memocraft.sqlite` 均被删除。注册表项、开始菜单与桌面快捷方式在三种场景下都清除（注册表清理在卸载器退出后数秒内完成，过早检查会误判为残留）。
 
 ## 已知限制
 
-1. **卸载页的视觉呈现未经人眼确认**：SSH 会话无可渲染的交互式桌面，卸载器进程会立即退出，无法截图；自动化只能验证命令行分支。页面文案与勾选行为需在本机双击卸载器确认一次。
-2. **未签名**：安装包无代码签名，Windows 首次运行会提示「未知发布者」，需手动允许。
+1. **卸载页的视觉呈现未经人眼确认**：SSH 会话无可渲染的交互式桌面，卸载器进程会立即退出，无法截图；自动化只能验证标记文件的读取分支。复选框是否真的写出 `delete`，需在本机双击卸载器实测一次。
+2. **未签名**：安装包无代码签名，Windows 首次运行会提示「未知发布者」。
 3. **删除不可恢复**：勾选删除后知识库无法找回，页面文案已明确提示。
 
-## 后续建议
+## 修订记录
 
-- 若将来启用应用内自动更新，注意模板对 `isUpdated` 场景的保护：更新时不应触发数据删除。当前实现只在用户勾选或显式传参时删除，未显示页面时保持默认的保留语义。
-- 本节 NSIS 约束建议在改动 `build/installer.nsh` 前完整重读。
+- 2026-10-13：首版用寄存器传递勾选结果，构建通过，但用户实测勾选后数据仍残留，判定为状态未传递到位。
+- 2026-10-15：改为标记文件方案，并按用户要求把浏览器缓存一并清除（删除整个 `%APPDATA%\memocraft`，而非只删 `data` 子目录）。

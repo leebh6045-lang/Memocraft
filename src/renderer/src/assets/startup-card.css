@@ -1,0 +1,311 @@
+/* 独立窗口只承载这一张卡片；曲面在纸页下方，不移动标题或便签。 */
+html[data-view='startup'],
+[data-view='startup'] body,
+[data-view='startup'] #app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+.startup-definitions {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.startup-card {
+  --title: #393c37;
+  --secondary: #8c8476;
+  --muted: #777366;
+  --motto: #908879;
+  --track: #6d624520;
+  --load-light: #8a7753;
+  --load-mid: #b69c6c;
+  --load-glint: #f3e3bc;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 8px;
+  background: #e9f0f3;
+  color: var(--title);
+  font:
+    14px/1.65 -apple-system,
+    BlinkMacSystemFont,
+    'PingFang SC',
+    'Segoe UI',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-app-region: drag;
+}
+
+.startup-card::before,
+.startup-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.startup-card::before {
+  z-index: -2;
+  background:
+    radial-gradient(ellipse at 45% 34%, #ffffffb0, transparent 72%),
+    linear-gradient(140deg, #eef4f6, #dce8ed);
+}
+
+.startup-card::after {
+  z-index: 2;
+  opacity: 0.065;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' opacity='.4' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.startup-copy {
+  position: relative;
+  z-index: 1;
+  padding: 44px 36px 0;
+}
+
+.startup-copy h1 {
+  margin: 0;
+  font:
+    400 42px/1.12 Georgia,
+    'Times New Roman',
+    serif;
+  letter-spacing: -0.06em;
+}
+
+.startup-version {
+  margin: 11px 0 0;
+  color: var(--secondary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.mist-background {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+}
+
+.paper-art {
+  position: absolute;
+  right: 26px;
+  top: 65px;
+  width: 182px;
+  height: 207px;
+  transform: rotate(-13deg);
+}
+
+.paper-sheet {
+  position: absolute;
+  width: 152px;
+  height: 192px;
+  border-radius: 2px;
+  box-shadow: 0 3px 9px #6b655219;
+}
+
+.paper-sheet:nth-child(1) {
+  left: 21px;
+  top: 13px;
+  transform: rotate(9deg);
+  background: #cecbbf;
+  box-shadow: 0 15px 22px #6b65521c;
+}
+
+.paper-sheet:nth-child(2) {
+  left: 9px;
+  top: 5px;
+  transform: rotate(4deg);
+  background: #e9e3d4;
+}
+
+.paper-sheet:nth-child(3) {
+  background: linear-gradient(115deg, #fffdfa, #f0e9da);
+  clip-path: polygon(0 0, 77% 0, 100% 19%, 100% 100%, 0 100%);
+}
+
+.paper-fold {
+  position: absolute;
+  top: 0;
+  right: 30px;
+  width: 35px;
+  height: 37px;
+  background: linear-gradient(45deg, #c6c2b3, #f2eee4);
+  clip-path: polygon(0 0, 0 100%, 100% 100%);
+  box-shadow: -2px 3px 4px #74695016;
+}
+
+.paper-lines {
+  position: absolute;
+  left: 21px;
+  right: 43px;
+  top: 79px;
+  height: 60px;
+  opacity: 0.38;
+  background: repeating-linear-gradient(
+    to bottom,
+    #a5a397 0,
+    #a5a397 1px,
+    transparent 1px,
+    transparent 15px
+  );
+}
+
+.paper-lines::after {
+  content: '';
+  position: absolute;
+  width: 39px;
+  height: 3px;
+  background: #97998f;
+  top: -23px;
+  left: 0;
+}
+
+.startup-art {
+  display: none;
+  position: absolute;
+  width: 322px;
+  height: 360px;
+  right: -27px;
+  top: -1px;
+  transform: rotate(-11deg);
+}
+
+.startup-art .front {
+  fill: url(#front-paper);
+}
+.startup-art .back {
+  fill: url(#back-paper);
+}
+.startup-art .top {
+  fill: url(#top-paper);
+}
+.startup-art .shadow {
+  fill: #09090c;
+}
+.startup-art .edge {
+  fill: none;
+  stroke: #eeece5;
+  stroke-opacity: 0.28;
+  stroke-width: 0.7;
+}
+
+.startup-bottom {
+  position: absolute;
+  z-index: 1;
+  bottom: 22px;
+  left: 35px;
+  right: 28px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.loading-caption {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 0 0 9px;
+}
+.progress-track {
+  width: 130px;
+  height: 2px;
+  border-radius: 4px;
+  background: var(--track);
+  overflow: hidden;
+}
+.progress-line {
+  width: 40%;
+  height: 100%;
+  border-radius: inherit;
+  /* 两端收尖、中央反光，只平移短线，保留流动感。 */
+  clip-path: ellipse(50% 50% at 50% 50%);
+  background:
+    radial-gradient(ellipse at 54% 36%, var(--load-glint), transparent 65%),
+    linear-gradient(
+      90deg,
+      transparent,
+      var(--load-mid) 18%,
+      var(--load-light) 50%,
+      var(--load-mid) 82%,
+      transparent
+    );
+  transform: translateX(-100%);
+}
+[data-startup-loading='running'] .progress-line {
+  animation: startup-loading var(--startup-duration) ease-in-out infinite;
+}
+.startup-motto {
+  color: var(--motto);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+}
+
+[data-theme='dark'] .startup-card {
+  --title: #e8e7ec;
+  --secondary: #a09fa8b0;
+  --muted: #b0afb8bd;
+  --motto: #aaa7af91;
+  --track: #c2bfc820;
+  --load-light: #e6d6b7;
+  --load-mid: #b3a388;
+  --load-glint: #fff3d9;
+  background: #17181c;
+}
+[data-theme='dark'] .startup-card::before {
+  background:
+    radial-gradient(ellipse at 76% 43%, #484a5075, transparent 58%),
+    radial-gradient(ellipse at 18% 100%, #121316, transparent 56%),
+    linear-gradient(130deg, #26272c, #17181c);
+}
+[data-theme='dark'] .startup-card::after {
+  opacity: 0.1;
+  mix-blend-mode: normal;
+}
+[data-theme='dark'] .startup-copy {
+  padding-top: 40px;
+}
+[data-theme='dark'] .startup-copy h1 {
+  font:
+    600 32px/1.2 -apple-system,
+    BlinkMacSystemFont,
+    'PingFang SC',
+    'Segoe UI',
+    sans-serif;
+  letter-spacing: -0.04em;
+}
+[data-theme='dark'] .paper-art,
+[data-theme='dark'] .mist-background {
+  display: none;
+}
+[data-theme='dark'] .startup-art {
+  display: block;
+}
+
+@keyframes startup-loading {
+  from {
+    transform: translateX(-100%);
+  }
+  /* 提前约 20ms 滑出右侧，浮层交接前能完成一轮。 */
+  96%,
+  to {
+    transform: translateX(250%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-line,
+  [data-startup-loading='running'] .progress-line {
+    animation: none;
+    transform: translateX(75%);
+  }
+}

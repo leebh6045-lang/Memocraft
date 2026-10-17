@@ -1,3 +1,4 @@
+import { waitForMainWindow } from './main-window';
 import { DatabaseSync } from 'node:sqlite';
 import { rmSync, writeFileSync } from 'node:fs';
 import { mkdtemp, mkdir, rm } from 'node:fs/promises';
@@ -265,7 +266,7 @@ test('真实桌面：Flash 视觉建议顺序、预算提示、stale 与 Pro 降
         (process.platform !== 'linux' || safeStorage.getSelectedStorageBackend() !== 'basic_text'),
     );
     expect(protectedStorage, '视觉验收需要真实系统密钥保护').toBe(true);
-    const page = await app.firstWindow();
+    const page = await waitForMainWindow(app);
     page.on('pageerror', (error) => errors.push(error.message));
     await setKey(page);
     const body = page.getByRole('textbox', { name: '手记正文', exact: true });
@@ -421,7 +422,7 @@ test('真实桌面：图片尺寸、8 MiB base64 预算与缺失附件安全跳�
   const errors: string[] = [];
   try {
     app = await launch(directory, shellDirectory);
-    const page = await app.firstWindow();
+    const page = await waitForMainWindow(app);
     page.on('pageerror', (error) => errors.push(error.message));
     await setKey(page);
     const body = page.getByRole('textbox', { name: '手记正文', exact: true });

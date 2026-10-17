@@ -1,3 +1,4 @@
+import { waitForMainWindow } from './main-window';
 import { existsSync, readFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -85,7 +86,7 @@ test('真实桌面：AI 加密配置、两个模型、取消、备份恢复与�
     await stopped;
   };
   const attachPage = async (current: ElectronApplication) => {
-    const page = await current.firstWindow();
+    const page = await waitForMainWindow(current);
     page.on('pageerror', (error) => errors.push(error.message));
     expect(await current.evaluate(({ app }) => app.getPath('userData'))).toBe(shellDirectory);
     return page;

@@ -164,7 +164,7 @@ function removeTag(tag: string): void {
 
 <template>
   <section class="view view-home">
-    <header class="page-head">
+    <header class="page-head" data-startup-part="heading">
       <div>
         <h1>新建手记</h1>
         <p class="sub">先写下来，其他慢慢补。</p>
@@ -173,7 +173,12 @@ function removeTag(tag: string): void {
         <AppIcon name="focus" />专注
       </button>
     </header>
-    <div class="editor" :class="{ 'is-shake': shaking }" @paste="handlePaste">
+    <div
+      class="editor"
+      data-startup-part="editor"
+      :class="{ 'is-shake': shaking }"
+      @paste="handlePaste"
+    >
       <textarea
         ref="body"
         class="editor-body"
@@ -286,12 +291,17 @@ function removeTag(tag: string): void {
       @apply-tag="emit('apply-tag', $event)"
       @open-topic="emit('open-topic', $event)"
     />
-    <div class="draft-status" :class="{ error, 'is-empty': !status && !error }" aria-live="polite">
+    <div
+      class="draft-status"
+      data-startup-part="status"
+      :class="{ error, 'is-empty': !status && !error }"
+      aria-live="polite"
+    >
       <span class="dot" /><span>{{ error || status }}</span
       ><button v-if="error" class="btn-ghost" @click="emit('retry')">重试</button>
     </div>
     <div class="home-secondary" :inert="focused">
-      <div class="home-links">
+      <div class="home-links" data-startup-part="secondary">
         <button class="btn-quiet" @click="emit('create-topic')">
           <AppIcon name="plus" class="icon-s" />新建归纳
         </button>
@@ -299,16 +309,19 @@ function removeTag(tag: string): void {
           <AppIcon name="plus" class="icon-s" />新建事务
         </button>
       </div>
-      <div class="section-head">
+      <div class="section-head" data-startup-part="recent-heading">
         <h2>最近手记</h2>
         <button class="btn-ghost" @click="emit('navigate', 'notes')">查看全部 →</button>
       </div>
-      <div v-if="!notes.length" class="empty">还没有手记。写下第一条，它会出现在这里。</div>
+      <div v-if="!notes.length" class="empty" data-startup-part="recent-empty">
+        还没有手记。写下第一条，它会出现在这里。
+      </div>
       <TransitionGroup v-else name="list" tag="div" class="row-list">
         <button
           v-for="note in notes.slice(0, 4)"
           :key="note.id"
           class="row"
+          data-startup-part="recent-item"
           @click="emit('open', note.id)"
         >
           <span class="cat" :class="`cat-${note.category}`">{{ categoryLabel(note.category) }}</span

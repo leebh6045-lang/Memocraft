@@ -1,0 +1,70 @@
+<!-- 仅保留定稿卡片的静态元素，版本由启动入口以文本填入。 -->
+<svg class="startup-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="mist-blue" x1="0" y1="0" x2=".8" y2="1">
+      <stop stop-color="#acc5d6" stop-opacity=".6" />
+      <stop offset=".56" stop-color="#cbdde7" stop-opacity=".28" />
+      <stop offset="1" stop-color="#f9fbfd" stop-opacity=".9" />
+    </linearGradient>
+    <linearGradient id="mist-warm" x1="1" y1="0" x2="0" y2="1">
+      <stop stop-color="#e7d2bf" stop-opacity=".6" />
+      <stop offset=".5" stop-color="#f3e6da" stop-opacity=".1" />
+      <stop offset="1" stop-color="#c3d8e4" stop-opacity=".35" />
+    </linearGradient>
+    <linearGradient id="front-paper" x1="0" y1="0" x2=".3" y2="1">
+      <stop stop-color="#c9cbca" />
+      <stop offset="1" stop-color="#62676b" />
+    </linearGradient>
+    <linearGradient id="back-paper" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#74797e" />
+      <stop offset="1" stop-color="#383b40" />
+    </linearGradient>
+    <linearGradient id="top-paper" x1="0" y1="0" x2=".4" y2="1">
+      <stop stop-color="#fff2d7" />
+      <stop offset="1" stop-color="#c7bea4" />
+    </linearGradient>
+  </defs>
+</svg>
+<section class="startup-card" role="status" aria-label="Memocraft 正在启动">
+  <svg class="mist-background" viewBox="0 0 530 328" preserveAspectRatio="none" aria-hidden="true">
+    <path fill="url(#mist-blue)" d="M-30 82C110 182 250 14 404 77S540 158 570 96V-20H-30Z" />
+    <path fill="url(#mist-warm)" d="M-40 233C135 287 247 93 397 142S502 227 570 132V360H-40Z" />
+    <path
+      fill="#fff"
+      fill-opacity=".2"
+      d="M-30 236C161 277 242 128 392 165S512 256 550 221V360H-30Z"
+    />
+  </svg>
+  <div class="startup-copy">
+    <h1>Memocraft</h1>
+    <p class="startup-version"></p>
+  </div>
+  <svg class="startup-art" viewBox="0 0 512 512" aria-hidden="true">
+    <g transform="translate(0 23)">
+      <path
+        class="shadow"
+        opacity=".22"
+        d="M112 128H184L256 224 328 128H400V376L364 354 328 376V224L256 320 184 224V376H112Z"
+      />
+    </g>
+    <path class="front" d="M112 128 184 224V376H112Z" />
+    <path class="top" d="M112 128H184L256 224V320L184 224Z" />
+    <path class="back" d="M256 224 328 128H400L328 224 256 320Z" />
+    <path class="front" d="M328 224 400 128V376L364 354 328 376Z" />
+    <path class="edge" d="M112 128 184 224 256 320 328 224 400 128M328 224V376" />
+  </svg>
+  <div class="paper-art" aria-hidden="true">
+    <div class="paper-sheet"></div>
+    <div class="paper-sheet"></div>
+    <div class="paper-sheet"></div>
+    <div class="paper-fold"></div>
+    <div class="paper-lines"></div>
+  </div>
+  <div class="startup-bottom">
+    <div>
+      <p class="loading-caption">正在打开...</p>
+      <div class="progress-track" aria-hidden="true"><div class="progress-line"></div></div>
+    </div>
+    <span class="startup-motto">先写下来，其他慢慢补。</span>
+  </div>
+</section>

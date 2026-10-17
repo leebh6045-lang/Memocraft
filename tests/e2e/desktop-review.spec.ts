@@ -1,3 +1,4 @@
+import { waitForMainWindow } from './main-window';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -396,7 +397,7 @@ test('真实桌面：回顾引导、自动生成、持久缓存、周期导航�
   const errors: string[] = [];
   try {
     app = await launch(dataDirectory, shellDirectory);
-    const page = await app.firstWindow();
+    const page = await waitForMainWindow(app);
     page.on('pageerror', (error) => errors.push(error.message));
     await expect(page.getByRole('textbox', { name: '手记正文', exact: true })).toBeVisible();
     await mockReview(app);
@@ -499,7 +500,7 @@ test('真实桌面：回顾引导、自动生成、持久缓存、周期导航�
     await quit(app);
     app = undefined;
     app = await launch(dataDirectory, shellDirectory);
-    const reopened = await app.firstWindow();
+    const reopened = await waitForMainWindow(app);
     reopened.on('pageerror', (error) => errors.push(error.message));
     await expect(reopened.getByRole('textbox', { name: '手记正文', exact: true })).toBeVisible();
     await mockReview(app, { status: 500 });
@@ -654,7 +655,7 @@ test('真实桌面：回顾切页取消、恢复白名单、失败回滚与关�
   try {
     app = await launch(dataDirectory, shellDirectory);
     const firstApp = app;
-    const page = await app.firstWindow();
+    const page = await waitForMainWindow(app);
     page.on('pageerror', (error) => errors.push(error.message));
     await expect(page.getByRole('textbox', { name: '手记正文', exact: true })).toBeVisible();
     const noteId = await seedNote(page, 'SQLite 事务知识', 'SQLite 事务用于保持原子性。');
@@ -766,7 +767,7 @@ test('真实桌面：回顾切页取消、恢复白名单、失败回滚与关�
     expect(stdout).toContain('MEMOCRAFT_REVIEW_QUIT:{"calls":1,"aborted":true}');
     expect(cacheRows(dataDirectory)).toEqual(stableCache);
     app = await launch(dataDirectory, shellDirectory);
-    const reopened = await app.firstWindow();
+    const reopened = await waitForMainWindow(app);
     reopened.on('pageerror', (error) => errors.push(error.message));
     await expect(reopened.getByRole('textbox', { name: '手记正文', exact: true })).toBeVisible();
     await mockReview(app, { status: 500 });
@@ -799,7 +800,7 @@ test('真实桌面：Flash 回顾图片紧跟所属手记，缺失跳过与 Pro 
   const errors: string[] = [];
   try {
     app = await launch(dataDirectory, shellDirectory);
-    const page = await app.firstWindow();
+    const page = await waitForMainWindow(app);
     page.on('pageerror', (error) => errors.push(error.message));
     await expect(page.getByRole('textbox', { name: '手记正文', exact: true })).toBeVisible();
     expect(

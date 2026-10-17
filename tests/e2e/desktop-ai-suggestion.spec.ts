@@ -1,3 +1,4 @@
+import { waitForMainWindow } from './main-window';
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -160,7 +161,7 @@ test('真实桌面：归纳建议采纳、过期、取消、恢复和正常关�
     await stopped;
   };
   const attach = async (current: ElectronApplication) => {
-    const page = await current.firstWindow();
+    const page = await waitForMainWindow(current);
     page.on('pageerror', (error) => errors.push(error.message));
     expect(await current.evaluate(({ app }) => app.getPath('userData'))).toBe(shellDirectory);
     return page;

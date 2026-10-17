@@ -1,3 +1,4 @@
+import { waitForMainWindow } from './main-window';
 import { existsSync, readFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -129,7 +130,7 @@ test('真实桌面：自定义 AI 地址覆盖全部业务、输入保留、官�
       },
     });
   const attach = async (current: ElectronApplication) => {
-    const page = await current.firstWindow();
+    const page = await waitForMainWindow(current);
     page.on('pageerror', (error) => errors.push(error.message));
     expect(await current.evaluate(({ app }) => app.getPath('userData'))).toBe(shellDirectory);
     return page;

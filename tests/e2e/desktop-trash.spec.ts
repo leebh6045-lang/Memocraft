@@ -1,3 +1,4 @@
+import { waitForMainWindow } from './main-window';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -30,7 +31,7 @@ test('真实桌面：删除影响面、回收站与恢复顺序', async () => {
 
   try {
     app = await launch();
-    const page = await app.firstWindow();
+    const page = await waitForMainWindow(app);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     const body = page.getByRole('textbox', { name: '手记正文', exact: true });
@@ -205,7 +206,7 @@ test('真实桌面：删除影响面、回收站与恢复顺序', async () => {
     await quit(app);
     app = undefined;
     app = await launch();
-    const reopened = await app.firstWindow();
+    const reopened = await waitForMainWindow(app);
     reopened.on('pageerror', (error) => errors.push(error.message));
     await reopened.getByRole('button', { name: /回收站/ }).click();
     await expect(

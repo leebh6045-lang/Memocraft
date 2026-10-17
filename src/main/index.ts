@@ -19,6 +19,9 @@ import { AiImageReader } from './ai-image-reader';
 import { DeepSeekClient } from '../services/deepseek-client';
 import { registerAiIpc } from './ipc/ai';
 import { registerHelpIpc } from './ipc/help';
+import { StartupWindow } from './startup-window';
+
+let startup: StartupWindow | undefined;
 
 // 从终端启动后若终端被关闭，写 stdout/stderr 会失败（EIO/EPIPE）。Electron 内部也会写日志
 // （例如向已销毁的界面发消息时 console.error），没有监听就会变成"主进程未捕获异常"弹窗。
@@ -61,6 +64,14 @@ async function start(): Promise<void> {
   const migrationsDirectory = app.isPackaged
     ? join(process.resourcesPath, 'migrations')
     : join(app.getAppPath(), 'migrations');
+  const devUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
+  const rendererUrl = devUrl
+    ? new URL(devUrl).href
+    : pathToFileURL(fileURLToPath(new URL('../renderer/index.html', import.meta.url))).href;
+  startup = new StartupWindow(rendererUrl);
+  // 监听覆盖整个初始化阶段，重复启动或 Dock 激活也不能提前显示隐藏主窗口。
+  app.on('second-instance', () => startup?.activate());
+  app.on('activate', () => startup?.activate());
   // 启动检测：上一次恢复若被中断，先把恢复前的数据放回去，绝不打开半套数据。
   let startupNotice = '';
   try {
@@ -90,12 +101,9 @@ async function start(): Promise<void> {
     Menu.setApplicationMenu(null);
   }
   const window = createWindow();
+  startup.attachMainWindow(window);
   // 图片协议只由本窗口所属会话的存储能力应答，不注册到默认会话。
   serveImageProtocol(window.webContents.session, store);
-  const devUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
-  const rendererUrl = devUrl
-    ? new URL(devUrl).href
-    : pathToFileURL(fileURLToPath(new URL('../renderer/index.html', import.meta.url))).href;
   // 凭据在知识库目录之外；开发、正式与隔离测试各自使用对应 userData。
   const credentialDirectory = join(
     app.getPath('userData'),
@@ -167,27 +175,21 @@ async function start(): Promise<void> {
   window.once('closed', unregister);
   window.once('closed', unregisterAi);
   window.once('closed', unregisterHelp);
-  app.on('second-instance', () => {
-    if (window.isDestroyed()) return;
-    if (window.isMinimized()) window.restore();
-    window.show();
-    window.focus();
-  });
-  app.on('activate', () => {
-    if (!window.isDestroyed()) {
-      window.show();
-      window.focus();
-    }
-  });
-  await window.loadURL(rendererUrl);
-  // 启动提示在界面就绪后送达：恢复回滚这类事实必须让用户看到，而不是只写日志。
-  if (startupNotice) window.webContents.send(CHANNELS.appNotice, startupNotice);
+  await Promise.all([
+    window.loadURL(rendererUrl).then(() => {
+      // 恢复回滚这类事实必须让用户看到；不等待卡片退场才发送。
+      if (startupNotice) window.webContents.send(CHANNELS.appNotice, startupNotice);
+    }),
+    // 页面加载与启动超时并行观察，加载卡住时也能立即走失败清理。
+    startup.completion,
+  ]);
 }
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   void start().catch((error: unknown) => {
+    startup?.dispose();
     dialog.showErrorBox(
       'Memocraft 无法启动',
       error instanceof AppError

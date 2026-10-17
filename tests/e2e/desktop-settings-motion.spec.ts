@@ -1,3 +1,4 @@
+import { waitForMainWindow } from './main-window';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -317,7 +318,7 @@ test('真实桌面：设置分类丝滑切换、草稿和滚动保留、一级�
   try {
     app = await launch(join(root, 'data'), shellDirectory);
     expect(await app.evaluate(({ app }) => app.getPath('userData'))).toBe(shellDirectory);
-    const page = await app.firstWindow();
+    const page = await waitForMainWindow(app);
     page.on('pageerror', (error) => errors.push(error.message));
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await seedKey(page);
@@ -453,7 +454,7 @@ test('真实桌面：切出 AI 分类取消连接测试、迟到不回写、减�
     app = await launch(join(root, 'data'), shellDirectory);
     const currentApp = app;
     expect(await app.evaluate(({ app }) => app.getPath('userData'))).toBe(shellDirectory);
-    const page = await app.firstWindow();
+    const page = await waitForMainWindow(app);
     page.on('pageerror', (error) => errors.push(error.message));
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await seedKey(page);

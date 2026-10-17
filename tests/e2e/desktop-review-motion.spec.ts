@@ -1,3 +1,4 @@
+import { waitForMainWindow } from './main-window';
 import { randomUUID } from 'node:crypto';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -441,7 +442,7 @@ test('真实桌面：凝结入场与周月切换、淡蓝星芒、滑块和高�
   const errors: string[] = [];
   try {
     app = await launch(dataDirectory, shellDirectory);
-    const page = await app.firstWindow();
+    const page = await waitForMainWindow(app);
     page.on('pageerror', (error) => errors.push(error.message));
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await seedNoteAndKey(page);
@@ -595,7 +596,7 @@ test('真实桌面：周期动效不阻塞取消，减少动态效果立即切�
   try {
     app = await launch(dataDirectory, shellDirectory);
     const firstApp = app;
-    const page = await app.firstWindow();
+    const page = await waitForMainWindow(app);
     page.on('pageerror', (error) => errors.push(error.message));
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await seedNoteAndKey(page);

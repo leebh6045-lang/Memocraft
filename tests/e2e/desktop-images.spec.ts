@@ -1,3 +1,4 @@
+import { waitForMainWindow } from './main-window';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -56,7 +57,7 @@ test('真实桌面：粘贴图片、命名、放大查看与移出，重启后�
   const quit = quitApp;
   try {
     app = await launch();
-    let page = await app.firstWindow();
+    let page = await waitForMainWindow(app);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await expect(page.getByRole('heading', { name: '新建手记', exact: true })).toBeVisible();
@@ -139,7 +140,7 @@ test('真实桌面：粘贴图片、命名、放大查看与移出，重启后�
     await quit(app);
     app = undefined;
     app = await launch();
-    page = await app.firstWindow();
+    page = await waitForMainWindow(app);
     // 重启后的窗口是新的 Page，不能继续用已关闭页面的放大层定位器。
     viewer = page.getByRole('dialog', { name: '查看图片' });
     page.on('pageerror', (error) => errors.push(error.message));
@@ -222,7 +223,7 @@ test('真实桌面：首页草稿粘贴图片，保存后成为这条手记的�
   let app: ElectronApplication | undefined;
   try {
     app = await launchApp(directory);
-    const page = await app.firstWindow();
+    const page = await waitForMainWindow(app);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     const body = page.getByRole('textbox', { name: '手记正文', exact: true });
@@ -269,7 +270,7 @@ test('真实桌面：首页草稿粘贴图片，保存后成为这条手记的�
     await quitApp(app);
     app = undefined;
     app = await launchApp(directory);
-    const reopened = await app.firstWindow();
+    const reopened = await waitForMainWindow(app);
     reopened.on('pageerror', (error) => errors.push(error.message));
     await expect(reopened.getByRole('heading', { name: '新建手记', exact: true })).toBeVisible();
     await reopened

@@ -94,7 +94,7 @@ const suggestionLoading = computed(
   () => !!aiSuggestion.requestId.value || aiSuggestion.cancelling.value,
 );
 const pages = [
-  { id: 'home', label: '首页', icon: 'home' },
+  { id: 'home', label: '新建', icon: 'home' },
   { id: 'notes', label: '手记', icon: 'notes' },
   { id: 'topics', label: '主题归纳', icon: 'topics' },
   { id: 'threads', label: '长期事务', icon: 'threads' },
@@ -701,6 +701,11 @@ onMounted(() => {
     }) ?? (() => undefined);
   void library
     .initialize()
+    .then(async () => {
+      // 草稿或明确的失败页已渲染后才能交接窗口，不等待非必要的附图索引。
+      await nextTick();
+      window.memocraftWindow?.ready(resolvedTheme.value);
+    })
     .then(() => Promise.all([topicState.load(), threadState.load()]))
     .then(() => noteImageIndex.load(notes.value.map((note) => note.id)))
     .then(() => undefined);
@@ -735,10 +740,11 @@ onBeforeUnmount(() => {
   <div class="titlebar" aria-hidden="true" />
   <div
     class="app"
+    data-startup-part="shell"
     :class="{ focus: focused }"
     :inert="searchOpen || !!editing || closing || modalDepth > 0"
   >
-    <aside class="nav" :inert="focused">
+    <aside class="nav" data-startup-part="nav" :inert="focused">
       <div class="nav-brand">
         <img class="brand-mark" :src="brandMark" alt="" aria-hidden="true" />
         <div class="brand-name">Memocraft</div>
@@ -789,7 +795,7 @@ onBeforeUnmount(() => {
       </div>
     </aside>
     <main ref="main" class="main">
-      <div v-if="!loaded" class="view loading-view">
+      <div v-if="!loaded" class="view loading-view" data-startup-part="heading">
         <h1>{{ loading ? '正在打开知识库…' : '知识库暂时无法打开' }}</h1>
         <p role="alert">{{ loadError }}</p>
         <button v-if="!loading" class="btn-primary" @click="library.initialize">重试打开</button>
@@ -907,7 +913,7 @@ onBeforeUnmount(() => {
       </Transition>
     </main>
   </div>
-  <div class="corner">
+  <div class="corner" data-startup-part="corner">
     <span class="beta">内测中</span>
     <button
       type="button"
